@@ -2987,8 +2987,18 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         if (restarting[0] || dialog == null || !dialog.isShowing()) return;
         int nails = 100 + nailsBar.getProgress() * 10;
         int steps = 1000 + stepsBar.getProgress() * 500;
-        if (nails == generatorNails && steps == generatorSteps
-                && autoStopBox.isChecked() == generatorAutoStop) return;
+        boolean projectShapeChanged = nails != generatorNails
+                || autoStopBox.isChecked() != generatorAutoStop;
+        int generatedLines = generatedCandidate == null
+                ? 0 : Math.max(0, generatedCandidate.size() - 1);
+        boolean cutsExistingResult = steps < generatedLines;
+        if (!projectShapeChanged && !cutsExistingResult) {
+            // Raising the cap (or keeping it above an auto-stopped result) cannot change
+            // the project already shown. Remember the new cap for a later real regeneration,
+            // but do not throw away and recompute an identical preview.
+            generatorSteps = steps;
+            return;
+        }
         restarting[0] = true;
         dialog.dismiss();
         startLocalGeneration(nails, steps, generatorCircleMm, generatorLineMm,
@@ -3052,6 +3062,10 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                 .putBoolean(KEY_PREVIEW_USE_ACTUAL_RATIO, true)
                 .apply();
         setActiveAutoProject(null, null);
+        try { createActiveAutoProject(); }
+        catch (IOException e) {
+            showError("新项目自动保存失败：" + safeMessage(e));
+        }
         previewVisible = true;
         previewMinimized = false;
         persistSequence();
@@ -3122,6 +3136,10 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         prefs.edit().putInt(KEY_PROJECT_NAILS, generatorNails)
                 .putInt(KEY_PROJECT_CIRCLE_MM, generatorCircleMm)
                 .putFloat(KEY_PROJECT_LINE_MM, generatorLineMm).apply();
+        try { createActiveAutoProject(); }
+        catch (IOException e) {
+            showError("新项目自动保存失败：" + safeMessage(e));
+        }
         previewVisible = true; previewMinimized = false;
         persistSequence(); updateUi(); applyPreviewPanelState(true);
         toast("已载入播报器", Toast.LENGTH_SHORT);
@@ -4694,6 +4712,35 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     }
 
     /**
+     * Bind a newly imported/generated sequence to an auto-resume file immediately.
+     * Waiting for the first step change or onPause left a crash window where a new project
+     * existed only in preferences and was missing from Project Manager.
+     */
+    private void createActiveAutoProject() throws IOException {
+        if (sequence.size() < 2) return;
+        File dir = saveDirectory();
+        long timestamp = System.currentTimeMillis();
+        File target = new File(dir, "project_" + timestamp + ".sar");
+        int suffix = 2;
+        while (target.exists()) {
+            target = new File(dir, "project_" + timestamp + "_" + suffix++ + ".sar");
+        }
+        String name = automaticProjectName(importedFileName);
+        writeSave(target, name, importedFileName, currentIndex,
+                timestamp, sequence,
+                resolvedProjectNails(sequence, generatorNails),
+                generatorCircleMm, generatorLineMm, currentProjectThumbnail);
+        setActiveAutoProject(target, name);
+    }
+
+    private String automaticProjectName(String sourceName) {
+        String base = sequenceSourceBaseName(
+                sourceName == null ? "绕线项目" : sourceName);
+        if (base.length() > 24) base = base.substring(0, 24);
+        return "项目 · " + base;
+    }
+
+    /**
      * A project is the whole sequence plus its current position.  The active project stays in
      * preferences for fast resume; it is copied here only when another project replaces it.
      * Near the end, retaining it creates clutter and provides almost no recovery value.
@@ -4714,17 +4761,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                     generatorCircleMm, generatorLineMm, currentProjectThumbnail);
             return;
         }
-        File dir = saveDirectory();
-        File target = new File(dir, "project_" + System.currentTimeMillis() + ".sar");
-        String base = sequenceSourceBaseName(
-                importedFileName == null ? "绕线项目" : importedFileName);
-        if (base.length() > 24) base = base.substring(0, 24);
-        String name = "项目 · " + base;
-        writeSave(target, name, importedFileName, currentIndex,
-                System.currentTimeMillis(), sequence,
-                resolvedProjectNails(sequence, generatorNails),
-                generatorCircleMm, generatorLineMm, currentProjectThumbnail);
-        setActiveAutoProject(target, name);
+        createActiveAutoProject();
     }
 
     private void writeSave(File file, String name, String imported, int index,

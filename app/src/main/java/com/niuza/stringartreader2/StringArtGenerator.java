@@ -18,6 +18,12 @@ final class StringArtGenerator {
     interface ProgressListener { void onProgress(int complete, int total); }
 
     private static final int WORK_SIZE = 256;
+    /**
+     * Do not immediately revisit a recently used nail.  Without this short
+     * tabu window the greedy picker tends to oscillate between a few strong
+     * facial edges and spends a disproportionate number of strings there.
+     */
+    private static final int RECENT_PIN_WINDOW = 20;
     static final float MAX_CROP_ZOOM = 4f;
     /** The target stops two working pixels inside the 256 px square. */
     static final float TARGET_RADIUS_RATIO = 251f / 255f;
@@ -59,11 +65,6 @@ final class StringArtGenerator {
         final float threadOpacity = Math.max(26f, Math.min(82f,
                 26f + threadWidthPx * 90f)) / 255f;
         final float lineDarkness = threadOpacity * Math.min(1f, threadWidthPx);
-        // Thin lines need a lower residual floor so they can build enough density.
-        // Thick lines stop sooner because a single physical strand covers more area.
-        final float stopScore = autoStop
-                ? Math.max(.0015f, Math.min(.035f, lineDarkness * .10f))
-                : .0008f;
         final int minPinGap = Math.max(8, pinCount / 28);
         int[] pinX = new int[pinCount];
         int[] pinY = new int[pinCount];
@@ -77,7 +78,10 @@ final class StringArtGenerator {
         int[][] paths = new int[pinCount * pinCount][];
         ArrayList<Integer> result = new ArrayList<Integer>(requestedLines + 1);
         int current = 0;
-        int previous = -1;
+        int[] recentPins = new int[Math.min(RECENT_PIN_WINDOW, pinCount)];
+        int recentCount = 1;
+        int recentCursor = 1 % recentPins.length;
+        recentPins[0] = current;
         double threadMm = 0d;
         double areaMm2 = Math.PI * circleMm * circleMm * .25d;
         result.add(current);
@@ -86,7 +90,7 @@ final class StringArtGenerator {
             int best = -1;
             float bestScore = 0f;
             for (int candidate = 0; candidate < pinCount; candidate++) {
-                if (candidate == current || candidate == previous) continue;
+                if (isRecentPin(candidate, recentPins, recentCount)) continue;
                 int gap = Math.abs(candidate - current);
                 gap = Math.min(gap, pinCount - gap);
                 if (gap < minPinGap) continue;
@@ -97,25 +101,42 @@ final class StringArtGenerator {
                     paths[key] = path;
                     paths[candidate * pinCount + current] = path;
                 }
-                float score = 0f;
-                for (int p : path) score += residual[p];
-                score /= path.length;
+                /*
+                 * Minimise squared image error instead of merely looking for the
+                 * darkest remaining average.  residual is target darkness minus
+                 * darkness already drawn, and is deliberately allowed below zero:
+                 * drawing through an over-dark pixel must hurt the candidate.
+                 *
+                 * For one affected sample:
+                 *   oldError - newError = r² - (r-a)² = 2ar-a²
+                 * Summing (rather than averaging) measures the total improvement
+                 * made by the complete physical chord.
+                 */
+                float score = scoreLine(residual, path, lineDarkness);
                 if (score > bestScore) { bestScore = score; best = candidate; }
             }
-            if (best < 0 || bestScore < stopScore) break;
+            // Continuing after every possible chord has negative gain can only
+            // make the requested image less accurate, even with auto-stop off.
+            if (best < 0 || bestScore <= 0f) break;
             int[] selected = paths[current * pinCount + best];
             subtractLine(residual, selected, size, threadWidthPx, threadOpacity, lineDarkness);
             int gap = Math.abs(current - best);
             gap = Math.min(gap, pinCount - gap);
             threadMm += circleMm * Math.sin(Math.PI * gap / pinCount);
-            previous = current;
             current = best;
             result.add(current);
+            if (recentCount < recentPins.length) {
+                recentPins[recentCount++] = current;
+                recentCursor = recentCount % recentPins.length;
+            } else {
+                recentPins[recentCursor] = current;
+                recentCursor = (recentCursor + 1) % recentPins.length;
+            }
             if (listener != null) listener.onProgress(step + 1, requestedLines);
             // Residual exhaustion is the normal automatic stop.  The coverage cap is
             // deliberately much looser and only catches truly pathological inputs.
             if (autoStop && threadMm * safeLineMm / areaMm2 >= MAX_AVERAGE_COVERAGE
-                    && bestScore < Math.max(.012f, stopScore * 1.5f)) break;
+                    && bestScore / selected.length < lineDarkness * lineDarkness * .15f) break;
         }
         return result;
     }
@@ -144,11 +165,30 @@ final class StringArtGenerator {
                 float luminance = ((color >> 16 & 255) * 0.2126f + (color >> 8 & 255) * 0.7152f
                         + (color & 255) * 0.0722f) / 255f;
                 luminance = luminance * alpha + (1f - alpha);
-                // Gentle contrast expansion: a white board stays clear while facial shadows survive.
-                target[y * size + x] = Math.max(0f, Math.min(1f, (0.9f - luminance) * 1.35f));
+                // Preserve the full tonal range.  The old 0.90 white cut-off plus
+                // 1.35× contrast boost discarded light facial shading and pushed
+                // too much of the string budget into eyes and hard outlines.
+                target[y * size + x] = 1f - luminance;
             }
         }
         return target;
+    }
+
+    private static boolean isRecentPin(int candidate, int[] recentPins, int recentCount) {
+        for (int i = 0; i < recentCount; i++) {
+            if (recentPins[i] == candidate) return true;
+        }
+        return false;
+    }
+
+    static float squaredErrorGain(float residual, float amount) {
+        return 2f * amount * residual - amount * amount;
+    }
+
+    private static float scoreLine(float[] residual, int[] path, float amount) {
+        float score = 0f;
+        for (int p : path) score += squaredErrorGain(residual[p], amount);
+        return score;
     }
 
     /** A real thread has width.  Softly clearing adjacent samples stops the greedy
@@ -159,7 +199,7 @@ final class StringArtGenerator {
             int p = path[i];
             int x = p % size, y = p / size;
             if (widthPx < 1f) {
-                residual[p] = Math.max(0f, residual[p] - subPixelAmount);
+                residual[p] -= subPixelAmount;
                 // A small antialias fringe discourages repeatedly selecting nearly
                 // identical chords without pretending that a thin thread is wider.
                 subtractResidual(residual, size, x - 1, y, subPixelAmount * .06f);
@@ -190,7 +230,7 @@ final class StringArtGenerator {
     private static void subtractResidual(float[] residual, int size, int x, int y, float amount) {
         if (x < 0 || y < 0 || x >= size || y >= size) return;
         int p = y * size + x;
-        residual[p] = Math.max(0f, residual[p] - amount);
+        residual[p] -= amount;
     }
 
     private static int[] makePath(int x0, int y0, int x1, int y1, int size) {

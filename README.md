@@ -61,7 +61,7 @@ GitHub Actions 会对公开源码执行 Debug 与未签名 Release 构建，并�
 
 ## 项目信息
 
-- 当前版本：`26.2.4`（versionCode 55）
+- 当前版本：`26.3.0`（versionCode 56）
 - 最低 Android：8.0（API 26）
 - 目标 Android：API 35
 - 许可证：GNU GPL v3.0 only，另有兼容的第 7 条附加条款
