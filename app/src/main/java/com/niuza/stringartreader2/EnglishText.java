@@ -11,8 +11,9 @@ import java.util.Map;
 final class EnglishText {
     private static final Map<String, String> EXACT = new HashMap<String, String>();
     static {
-        put("生成图片", "Generate image"); put("导入 TXT", "Import TXT");
+        put("生成图片", "Generate image"); put("导入", "Import");
         put("预览", "Preview"); put("关预览", "Hide preview"); put("更多", "More");
+        put("更多功能", "More tools");
         put("存档", "Projects"); put("前一个", "Previous"); put("当前", "Current");
         put("下一个", "Next"); put("跳转", "Jump"); put("上一步", "Previous");
         put("下一步", "Next"); put("重播", "Replay"); put("播放", "Play");
@@ -37,11 +38,16 @@ final class EnglishText {
         put("导出当前 TXT", "Export current TXT");
         put("导出钉位图 PDF", "Export nail diagram PDF");
         put("关于与反馈", "About & feedback"); put("关于", "About");
+        put("分享应用", "Share app"); put("支持作者", "Support author");
+        put("微信小程序版", "WeChat Mini Program");
+        put("反馈联系", "Contact"); put("反馈与联系", "Feedback & contact");
+        put("版本与开源信息", "Version & open-source details");
+        put("GitHub 开源仓库", "GitHub repository");
         put("项目管理", "Project manager"); put("自动项目（点项目直接进入）", "Auto projects (tap to open)");
         put("手动存档（点项目直接进入）", "Manual saves (tap to open)"); put("暂无", "None yet");
         put("🔄 自动续做", "🔄 Auto-resume projects");
         put("📌 手动存档", "📌 Manual snapshots");
-        put("📌 保存当前节点", "📌 Save current step");
+        put("📌 保存当前", "📌 Save current");
         put("📥 导入存档", "📥 Import save");
         put("暂无存档", "No saves yet");
         put("新建存档", "New manual save"); put("读取这个存档", "Open this save");
@@ -79,6 +85,9 @@ final class EnglishText {
         put("点一下即可跳转至 X", "Tap to open X");
         put("Telegram：@nzdjjx", "Telegram: @nzdjjx");
         put("点一下即可跳转至 Telegram", "Tap to open Telegram");
+        put("或者找作者玩原神🤓☝️ UID：305028021", "Or play Genshin Impact with the author 🤓☝️ UID: 305028021");
+        put("点一下即可复制 UID", "Tap to copy UID");
+        put("已复制到剪贴板，原神启动！", "Copied to clipboard. Genshin, launch!");
         put("自动防全黑（达到安全墨量后提前停止）",
                 "Prevent over-darkening automatically (stop at the safe ink limit)");
         put("\n反馈与联系", "\nFeedback & contact");

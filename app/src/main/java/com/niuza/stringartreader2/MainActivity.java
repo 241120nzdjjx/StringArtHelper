@@ -12,6 +12,7 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -45,6 +46,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.OpenableColumns;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -133,6 +135,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     private static final String CONTACT_EMAIL = "241120nzdjjx@gmail.com";
     private static final String X_URL = "https://x.com/nzdjjx241120";
     private static final String TELEGRAM_URL = "https://t.me/nzdjjx";
+    private static final String GITHUB_URL = "https://github.com/241120nzdjjx/StringArtHelper";
 
     private static final String PREFS = "string_art_reader_v2";
     private static final String KEY_SEQUENCE = "sequence";
@@ -207,6 +210,9 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     private boolean repeatTwice = false;
     private boolean volumeKeysEnabled = false;
     private boolean mediaDuckingEnabled = true;
+    private long lastForwardStepAtMs = 0L;
+    private double observedStepDurationMs = 0d;
+    private int observedStepSamples = 0;
     private AudioFocusRequest speechFocusRequest;
     private boolean speechFocusHeld;
     private volatile String activeTtsUtteranceId;
@@ -393,9 +399,9 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         });
         toolbar.addView(generateButton, toolbarButtonParams());
 
-        Button importButton = makeButton("导入 TXT");
+        Button importButton = makeButton("导入");
         importButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { openTxtPicker(); }
+            @Override public void onClick(View v) { openImportPicker(); }
         });
         toolbar.addView(importButton, toolbarButtonParams());
 
@@ -557,6 +563,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         progressView.setTextColor(MUTED);
         progressView.setTextSize(14f);
         progressView.setGravity(Gravity.CENTER);
+        progressView.setMaxLines(landscape ? 1 : 2);
         progressView.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showJumpDialog(); }
         });
@@ -1276,7 +1283,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         button.setElevation(dp(3));
     }
 
-    private void openTxtPicker() {
+    private void openImportPicker() {
         pausePlayback();
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -1376,8 +1383,20 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
             return;
         }
         if (requestCode != REQUEST_OPEN_TXT) return;
+        String selectedName = queryFileName(uri);
+        String lowerName = selectedName.toLowerCase(Locale.ROOT);
+        if (lowerName.endsWith(".bin") || lowerName.endsWith(".sar")) {
+            importSaveFromUri(uri);
+            return;
+        }
+        if (!lowerName.endsWith(".txt")) {
+            showError(isEnglish()
+                    ? "Unsupported file type. Please choose a .txt sequence or .bin save file."
+                    : "不支持这种文件格式，请选择 .txt 序列或 .bin 存档文件。");
+            return;
+        }
         try {
-            String name = queryFileName(uri);
+            String name = selectedName;
             String text = readText(uri);
             ArrayList<Integer> parsed = parseSequence(text);
             if (parsed.size() < 2) {
@@ -1577,7 +1596,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     }
 
     private String queryFileName(Uri uri) {
-        String fallback = "绕线序列.txt";
+        String fallback = null;
         Cursor cursor = null;
         try {
             cursor = getContentResolver().query(uri, null, null, null, null);
@@ -1590,7 +1609,16 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
             }
         } catch (RuntimeException ignored) { }
         finally { if (cursor != null) cursor.close(); }
-        return fallback;
+        try {
+            String pathName = uri.getLastPathSegment();
+            if (pathName != null && pathName.trim().length() > 0) {
+                pathName = Uri.decode(pathName);
+                int separator = Math.max(pathName.lastIndexOf('/'), pathName.lastIndexOf(':'));
+                fallback = separator >= 0 ? pathName.substring(separator + 1) : pathName;
+            }
+        } catch (RuntimeException ignored) { }
+        return fallback == null || fallback.trim().length() == 0
+                ? "绕线序列.txt" : fallback;
     }
 
     private void updateUi() {
@@ -1600,7 +1628,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         updateQuickSettingsLabels();
         if (!loaded) {
             previousValueView.setText("—");
-            currentValueView.setText(tr("导入\nTXT"));
+            currentValueView.setText(tr("导入"));
             applyCurrentNumberSizing(false);
             nextValueView.setText("—");
             progressView.setText(tr("尚未导入序列"));
@@ -1614,7 +1642,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         currentValueView.setText(String.valueOf(sequence.get(currentIndex)));
         nextValueView.setText(currentIndex + 1 < sequence.size()
                 ? String.valueOf(sequence.get(currentIndex + 1)) : "—");
-        progressView.setText(tr("第 " + (currentIndex + 1) + " / " + sequence.size() + " 步"));
+        progressView.setText(progressAndEstimatedTimeText());
         if (pendingStepAnimation != 0) {
             animateStepChange(pendingStepAnimation);
             pendingStepAnimation = 0;
@@ -1741,6 +1769,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
 
     private void pausePlayback() {
         isPlaying = false;
+        resetForwardStepClock();
         playGeneration++;
         handler.removeCallbacksAndMessages(null);
         if (tts != null) tts.stop();
@@ -1758,6 +1787,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         handler.removeCallbacksAndMessages(null);
         if (tts != null) tts.stop();
         if (currentIndex < sequence.size() - 1) {
+            recordForwardStepTiming();
             currentIndex++;
             saveProgress();
             pendingStepAnimation = 1;
@@ -1781,6 +1811,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         handler.removeCallbacksAndMessages(null);
         if (tts != null) tts.stop();
         if (currentIndex > 0) {
+            resetForwardStepClock();
             currentIndex--;
             saveProgress();
             pendingStepAnimation = -1;
@@ -1796,7 +1827,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     private void replayCurrent() {
         if (previewAnimationRunning) return;
         releaseHeldPreviewResult();
-        if (sequence.isEmpty()) { openTxtPicker(); return; }
+        if (sequence.isEmpty()) { openImportPicker(); return; }
         playGeneration++;
         handler.removeCallbacksAndMessages(null);
         if (tts != null) tts.stop();
@@ -1911,6 +1942,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                             toast("序列播报完成", Toast.LENGTH_LONG);
                             return;
                         }
+                        recordForwardStepTiming();
                         currentIndex++;
                         saveProgress();
                         pendingStepAnimation = 1;
@@ -3147,21 +3179,84 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     }
 
     private void showMoreMenu() {
-        final String[] choices = new String[] {
-                tr("播报设置"), tr("界面语言"), tr("导出当前 TXT"),
-                tr("导出钉位图 PDF"), tr("关于与反馈")
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(16), dp(4), dp(16), dp(4));
+
+        TextView guide = dialogLabel(isEnglish()
+                ? "67"
+                : "关注塔菲喵");
+        guide.setTextSize(12f);
+        guide.setTextColor(MUTED);
+        guide.setPadding(dp(4), 0, dp(4), dp(8));
+        panel.addView(guide);
+
+        final String[] labels = new String[] {
+                "🎙 " + tr("播报设置"), "🌐 " + tr("界面语言"),
+                "🗂 " + tr("项目管理"), "📄 " + tr("导出当前 TXT"),
+                "📐 " + tr("导出钉位图 PDF"), "📤 " + tr("分享应用"),
+                "📱 " + tr("微信小程序版"), "💜 " + tr("支持作者"),
+                "💬 " + tr("反馈与联系"), "ℹ️ " + tr("关于")
         };
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(tr("更多功能"))
+                .setView(panel)
+                .setNegativeButton(tr("关闭"), null)
+                .create();
+        int columns = landscape ? 3 : 2;
+        LinearLayout row = null;
+        for (int i = 0; i < labels.length; i++) {
+            if (i % columns == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                panel.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+            }
+            final int action = i;
+            Button button = makeButton(labels[i]);
+            button.setTextSize(isEnglish() ? 11f : 12.5f);
+            button.setSingleLine(false);
+            button.setMaxLines(2);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    dialog.dismiss();
+                    openMoreAction(action);
+                }
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(44), 1f);
+            params.setMargins(dp(3), dp(2), dp(3), dp(2));
+            row.addView(button, params);
+        }
+        dialog.show();
+    }
+
+    private void openMoreAction(int action) {
+        switch (action) {
+            case 0: showSettingsDialog(); break;
+            case 1: showLanguageDialog(); break;
+            case 2: showSaveManager(true); break;
+            case 3: exportCurrentSequence(); break;
+            case 4: showTemplateConfig(); break;
+            case 5: shareInstalledApplication(); break;
+            case 6: showMiniProgramDialog(); break;
+            case 7: showSupportDialog(); break;
+            case 8: showContactDialog(); break;
+            default: showAboutDialog(); break;
+        }
+    }
+
+    private void showMiniProgramDialog() {
+        TextView message = dialogLabel(isEnglish()
+                ? "Don't want to download the Android app, or need to use String Art Helper on a non-Android device? Try our WeChat Mini Program.\n\nSearch WeChat for “绕线画助手”. Some screens and interactions differ, but the core features remain the same. .sar saves and TXT sequences can also be moved between the Android app and Mini Program."
+                : "不想下载应用，或想在非 Android 设备上使用？请试试我们的微信小程序版。\n\n在微信中搜索“绕线画助手”即可使用。部分界面与操作体验略有差别，但核心功能不变；.sar 存档和 TXT 序列也可以与 Android 版跨平台互通。");
+        message.setTextSize(15f);
+        message.setLineSpacing(dp(3), 1f);
+        message.setPadding(dp(22), dp(8), dp(22), dp(8));
         new AlertDialog.Builder(this)
-                .setTitle(tr("更多"))
-                .setItems(choices, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface dialog, int which) {
-                        if (which == 0) showSettingsDialog();
-                        else if (which == 1) showLanguageDialog();
-                        else if (which == 2) exportCurrentSequence();
-                        else if (which == 3) showTemplateConfig();
-                        else showAboutDialog();
-                    }
-                }).show();
+                .setTitle("📱 " + tr("微信小程序版"))
+                .setView(message)
+                .setPositiveButton(tr("知道了"), null)
+                .show();
     }
 
     private void exportCurrentSequence() {
@@ -3417,7 +3512,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                     @Override public void onClick(DialogInterface dialog, int which) {
                         delayMs = 500 + bar.getProgress() * 100;
                         prefs.edit().putInt(KEY_DELAY, delayMs).apply();
-                        updateQuickSettingsLabels();
+                        updateUi();
                     }
                 }).show();
     }
@@ -3551,74 +3646,109 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     private void showAboutDialog() {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(22), dp(10), dp(22), dp(4));
+        panel.setPadding(dp(20), dp(8), dp(20), dp(4));
 
-        String fingerprint = buildCertificateSha256();
         TextView intro = dialogLabel(isEnglish()
                 ? "🧶 String Art Helper v" + BuildConfig.VERSION_NAME
-                    + "\n\n🔒 Free, open source and fully offline (definitely not because I can't afford a server—definitely not). Images, TXT files and project saves are processed only on your device and are never uploaded."
-                    + "\n\nThis app took a great deal of time to design, tune and polish. If it helps you, you can support the author below. If money is tight, a like or a few Bilibili coins helps just as much."
-                    + "\n\nAuthor: 牛杂の经济学"
+                    + "\n\n🔒 Free, open source and fully offline. Images, TXT files and project saves are processed only on your device and are never uploaded."
+                    + "\n\n⭐ Source code, release notes and issue reporting are available in our GitHub repository. Contributions and suggestions are welcome."
+                    + "\n\nAuthor: 牛杂の经济学 · GNU GPL v3.0 only"
+                : "🧶 绕线助手 v" + BuildConfig.VERSION_NAME
+                    + "\n\n🔒 免费、开源、完全离线（绝对不是没钱租服务器，绝对不是）。图片、TXT 和项目存档只在你的设备上处理，不会上传任何数据。"
+                    + "\n\n⭐ 项目源码、版本更新记录与问题反馈均可在 GitHub 仓库查看，也欢迎提出建议或参与完善。"
+                    + "\n\n作者：牛杂の经济学 · GNU GPL v3.0 only");
+        intro.setTextSize(15f);
+        intro.setLineSpacing(dp(3), 1f);
+        panel.addView(intro);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        String[] actionLabels = {"💜 " + tr("支持作者"), "📤 " + tr("分享应用"),
+                "💬 " + tr("反馈联系")};
+        for (int i = 0; i < actionLabels.length; i++) {
+            final int action = i;
+            Button button = makeButton(actionLabels[i]);
+            button.setTextSize(isEnglish() ? 10.5f : 12f);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    if (action == 0) showSupportDialog();
+                    else if (action == 1) shareInstalledApplication();
+                    else showContactDialog();
+                }
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1f);
+            params.setMargins(dp(2), 0, dp(2), 0);
+            actions.addView(button, params);
+        }
+        panel.addView(actions, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+
+        Button details = makeButton("版本与开源信息");
+        details.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showTechnicalAboutDialog(); }
+        });
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
+        detailParams.setMargins(dp(2), dp(7), dp(2), 0);
+        panel.addView(details, detailParams);
+
+        Button github = makeButton("⭐ " + tr("GitHub 开源仓库"));
+        github.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { openExternalUri(GITHUB_URL); }
+        });
+        LinearLayout.LayoutParams githubParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
+        githubParams.setMargins(dp(2), dp(7), dp(2), 0);
+        panel.addView(github, githubParams);
+
+        new AlertDialog.Builder(this)
+                .setTitle(tr("关于"))
+                .setView(panel)
+                .setPositiveButton(tr("知道了"), null)
+                .show();
+    }
+
+    private void showTechnicalAboutDialog() {
+        String fingerprint = buildCertificateSha256();
+        TextView details = dialogLabel(isEnglish()
+                ? "Version: " + BuildConfig.VERSION_NAME
+                    + "\nAuthor: 牛杂の经济学"
                     + "\nLicense: GNU GPL v3.0 only"
                     + "\nPackage: " + getPackageName()
                     + "\nBuild: " + (BuildConfig.DEBUG ? "debug/test" : "release")
                     + "\nSigning certificate SHA-256:\n" + fingerprint
                     + "\n\nPlease help protect the free open-source edition. Modified distributions must retain the required legal notices, clearly disclose modifications and never impersonate an official build. If you find an unattributed copy, a closed-source resale or a fake official version, please save evidence and contact the author."
-                : "🧶 绕线助手 v" + BuildConfig.VERSION_NAME
-                    + "\n\n🔒 免费、开源、完全离线（绝对不是没钱租服务器，绝对不是）。图片、TXT 和项目存档只在你的设备上处理，不会上传任何数据。"
-                    + "\n\n从流程设计、生成算法到每个小细节都耗费了很多心血。如果它帮到了你，欢迎在下方支持作者；暂时不方便也完全没关系，去 Bilibili 点个赞、投几个币同样是支持。"
-                    + "\n\n作者：牛杂の经济学"
+                : "版本：" + BuildConfig.VERSION_NAME
+                    + "\n作者：牛杂の经济学"
                     + "\n许可证：GNU GPL v3.0 only"
                     + "\n包名：" + getPackageName()
                     + "\n构建类型：" + (BuildConfig.DEBUG ? "测试版" : "发布版")
                     + "\n安装包签名 SHA-256：\n" + fingerprint
                     + "\n\n也请帮忙维护真正免费开源的版本：修改后再分发时必须保留必要的法律与作者声明，明确标注修改内容，且不得冒充官方构建。如果发现删署名、闭源倒卖或冒充官方的版本，请保留证据并联系作者。");
-        intro.setTextSize(15f);
-        intro.setLineSpacing(dp(3), 1f);
-        intro.setTextIsSelectable(true);
-        panel.addView(intro);
+        details.setTextSize(14f);
+        details.setLineSpacing(dp(3), 1f);
+        details.setTextIsSelectable(true);
+        details.setPadding(dp(22), dp(8), dp(22), dp(8));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(details);
+        new AlertDialog.Builder(this)
+                .setTitle(tr("版本与开源信息"))
+                .setView(scroll)
+                .setPositiveButton(tr("知道了"), null)
+                .show();
+    }
 
-        Button support = makeButton(isEnglish()
-                ? "💜 Support the author · Show payment QR codes"
-                : "💜 支持作者 · 展开支付宝 / 微信收款码");
-        support.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { showSupportDialog(); }
-        });
-        LinearLayout.LayoutParams supportParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
-        supportParams.setMargins(0, dp(12), 0, dp(4));
-        panel.addView(support, supportParams);
-
-        TextView shareTitle = dialogLabel(isEnglish()
-                ? "\n📤 Share with a friend"
-                : "\n📤 想分享给朋友？");
-        shareTitle.setTextSize(15f);
-        panel.addView(shareTitle);
-        TextView shareNote = dialogLabel(isEnglish()
-                ? "Send the currently installed version of String Art Helper. The official signature is preserved, so future official updates can be installed normally. The recipient may need to allow installs from the receiving app."
-                : "将当前安装的绕线助手发送给朋友。安装包会保留正式签名，以后仍可正常覆盖升级；对方安装时可能需要允许接收文件的应用安装未知应用。");
-        shareNote.setTextSize(12f);
-        shareNote.setTextColor(MUTED);
-        shareNote.setPadding(0, dp(2), 0, dp(6));
-        panel.addView(shareNote);
-        Button shareApk = makeButton("分享安装包");
-        shareApk.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { shareInstalledApplication(); }
-        });
-        panel.addView(shareApk, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
-
-        TextView contact = dialogLabel("\n💬 反馈与联系");
-        contact.setTextSize(15f);
-        panel.addView(contact);
+    private void showContactDialog() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(18), dp(6), dp(18), dp(4));
 
         Button bilibili = makeButton(contactActionText(tr("Bilibili：牛杂の经济学"), tr("点一下即可跳转至 bilibili")));
         bilibili.setGravity(Gravity.CENTER_VERTICAL);
         bilibili.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { openBilibiliProfile(); }
         });
-        panel.addView(bilibili, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        panel.addView(bilibili, contactButtonParams(0));
 
         Button email = makeButton(contactActionText(tr("邮箱：241120nzdjjx@gmail.com"), tr("点一下即可跳转至邮箱")));
         email.setGravity(Gravity.CENTER_VERTICAL);
@@ -3633,32 +3763,49 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                 }
             }
         });
-        panel.addView(email, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        panel.addView(email, contactButtonParams(6));
 
         Button x = makeButton(contactActionText(tr("推特（X）：@nzdjjx241120"), tr("点一下即可跳转至 X")));
         x.setGravity(Gravity.CENTER_VERTICAL);
         x.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { openExternalUri(X_URL); }
         });
-        panel.addView(x, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        panel.addView(x, contactButtonParams(6));
 
         Button telegram = makeButton(contactActionText(tr("Telegram：@nzdjjx"), tr("点一下即可跳转至 Telegram")));
         telegram.setGravity(Gravity.CENTER_VERTICAL);
         telegram.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { openExternalUri(TELEGRAM_URL); }
         });
-        panel.addView(telegram, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        panel.addView(telegram, contactButtonParams(6));
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(panel);
+        Button genshin = makeButton(contactActionText(
+                tr("或者找作者玩原神🤓☝️ UID：305028021"), tr("点一下即可复制 UID")));
+        genshin.setGravity(Gravity.CENTER_VERTICAL);
+        genshin.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Genshin Impact UID", "305028021"));
+                    Toast.makeText(MainActivity.this,
+                            tr("已复制到剪贴板，原神启动！"), Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        panel.addView(genshin, contactButtonParams(6));
+
         new AlertDialog.Builder(this)
-                .setTitle(tr("关于"))
-                .setView(scroll)
+                .setTitle(tr("反馈与联系"))
+                .setView(panel)
                 .setPositiveButton(tr("知道了"), null)
                 .show();
+    }
+
+    private LinearLayout.LayoutParams contactButtonParams(int topMarginDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48));
+        params.setMargins(0, dp(topMarginDp), 0, 0);
+        return params;
     }
 
     private void showSupportDialog() {
@@ -3982,9 +4129,23 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         guide.setPadding(dp(4), dp(8), dp(4), 0);
         panel.addView(guide);
 
+        TextView crossPlatform = dialogLabel(isEnglish()
+                ? "🔄 Cross-platform: .sar saves and TXT sequences can be moved between the Android app and the WeChat Mini Program. Search WeChat for “绕线画助手”. The UI differs slightly, but progress, sequences and core parameters remain usable."
+                : "🔄 跨平台：Android 与微信小程序版可互相导入、导出 .sar 存档和 TXT 序列。微信搜索“绕线画助手”即可使用；两端 UI 略有差别，但存档进度、序列和核心参数可以继续使用。");
+        crossPlatform.setTextSize(12f);
+        crossPlatform.setTextColor(FG);
+        crossPlatform.setLineSpacing(dp(2), 1f);
+        crossPlatform.setPadding(dp(10), dp(8), dp(10), dp(8));
+        crossPlatform.setBackground(roundedBackground(PANEL_2, 10));
+        LinearLayout.LayoutParams crossParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        crossParams.setMargins(0, dp(8), 0, 0);
+        panel.addView(crossPlatform, crossParams);
+
         LinearLayout primaryActions = new LinearLayout(this);
         primaryActions.setOrientation(LinearLayout.HORIZONTAL);
-        Button newSave = makeButton("📌 保存当前节点");
+        primaryActions.setBaselineAligned(false);
+        Button newSave = makeButton("📌 保存当前");
         newSave.setSingleLine(false);
         newSave.setMaxLines(2);
         newSave.setTextSize(isEnglish() ? 11f : 13f);
@@ -4002,10 +4163,18 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         importSave.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { openSavePicker(); }
         });
+        Button shareApp = makeButton("📤 分享应用");
+        shareApp.setSingleLine(false);
+        shareApp.setMaxLines(2);
+        shareApp.setTextSize(isEnglish() ? 10.5f : 12.5f);
+        shareApp.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { shareInstalledApplication(); }
+        });
         LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         primaryParams.setMargins(dp(3), 0, dp(3), 0);
         primaryActions.addView(newSave, primaryParams);
         primaryActions.addView(importSave, new LinearLayout.LayoutParams(primaryParams));
+        primaryActions.addView(shareApp, new LinearLayout.LayoutParams(primaryParams));
         LinearLayout.LayoutParams primaryRowParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         primaryRowParams.setMargins(dp(-3), dp(10), dp(-3), dp(4));
@@ -4856,6 +5025,65 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         return tr(String.format(Locale.CHINA, "%.1f 秒", milliseconds / 1000f));
     }
 
+    private void recordForwardStepTiming() {
+        long now = SystemClock.elapsedRealtime();
+        if (lastForwardStepAtMs > 0L) {
+            long duration = now - lastForwardStepAtMs;
+            // Ignore accidental double taps and long pauses/background time. The estimate should
+            // describe active winding pace, not how long the project has existed.
+            if (duration >= 500L && duration <= 60_000L) {
+                if (observedStepSamples == 0) observedStepDurationMs = duration;
+                else observedStepDurationMs = observedStepDurationMs * .75d + duration * .25d;
+                observedStepSamples++;
+            }
+        }
+        lastForwardStepAtMs = now;
+    }
+
+    private void resetForwardStepClock() {
+        lastForwardStepAtMs = 0L;
+    }
+
+    private long estimatedStepDurationMs() {
+        if (observedStepSamples > 0) return Math.max(500L, Math.round(observedStepDurationMs));
+        // Before enough real steps are observed, use the selected post-speech delay plus a small
+        // TTS allowance. This gives a useful first estimate without inventing saved history.
+        double speechAllowance = 700d / Math.max(.5f, speechRate);
+        if (repeatTwice) speechAllowance *= 1.8d;
+        return Math.max(500L, Math.round(delayMs + speechAllowance));
+    }
+
+    private String progressAndEstimatedTimeText() {
+        int remaining = Math.max(0, sequence.size() - 1 - currentIndex);
+        long estimatedMs;
+        try {
+            estimatedMs = Math.multiplyExact((long) remaining, estimatedStepDurationMs());
+        } catch (ArithmeticException ignored) {
+            estimatedMs = Long.MAX_VALUE;
+        }
+        String estimate = formatEstimatedTime(estimatedMs);
+        if (isEnglish()) {
+            String progress = "Step " + (currentIndex + 1) + " / " + sequence.size();
+            return landscape ? progress + " · " + estimate : progress + "\n" + estimate;
+        }
+        String progress = "第 " + (currentIndex + 1) + " / " + sequence.size() + " 步";
+        return landscape ? progress + " · " + estimate : progress + "\n" + estimate;
+    }
+
+    private String formatEstimatedTime(long milliseconds) {
+        if (milliseconds < 60_000L) return isEnglish()
+                ? "Estimated under one minute" : "预计少于一分钟";
+        long minutes = Math.max(1L, (milliseconds + 59_999L) / 60_000L);
+        if (minutes < 60L) return isEnglish()
+                ? "Estimated " + minutes + (minutes == 1L ? " minute" : " minutes")
+                : "预计 " + minutes + " 分钟";
+        long hours = minutes / 60L;
+        long remainder = minutes % 60L;
+        if (isEnglish()) return "Estimated " + hours + (hours == 1L ? " hour" : " hours")
+                + (remainder == 0L ? "" : " " + remainder + " min");
+        return "预计 " + hours + " 小时" + (remainder == 0L ? "" : " " + remainder + " 分钟");
+    }
+
     private String formatLineWidthMm(float widthMm) {
         return String.format(Locale.US, "%.2f mm", widthMm);
     }
@@ -4951,6 +5179,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     @Override
     protected void onPause() {
         super.onPause();
+        resetForwardStepClock();
         finishFullPreviewAnimation(false);
         pausePlayback();
         saveProgress();
