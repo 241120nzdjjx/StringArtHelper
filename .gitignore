@@ -26,3 +26,16 @@ output/
 *.iml
 .DS_Store
 Thumbs.db
+
+
+# WeChat Mini Program private configuration
+wechat-miniprogram/project.private.config.json
+wechat-miniprogram/.idea/
+wechat-miniprogram/node_modules/
+wechat-miniprogram/miniprogram_npm/
+
+# Local test and generated files
+wechat-miniprogram/*.log
+wechat-miniprogram/*.zip
+wechat-miniprogram/output/
+wechat-miniprogram/temp/
