@@ -75,11 +75,16 @@ button[disabled] {
   opacity: .38;
 }
 
-.file-import-hint {
+.file-import-hint,
+.file-export-hint {
   margin: 10rpx 8rpx 4rpx;
   color: #9d9dae;
   font-size: 22rpx;
   line-height: 1.55;
+}
+
+.preview-file-export-hint {
+  margin-top: 14rpx;
 }
 
 .row {

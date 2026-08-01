@@ -53,4 +53,5 @@
     <button class="secondary" disabled="{{animationRunning}}" bindtap="exportTxt">{{text.exportTxt}}</button>
     <button class="secondary" disabled="{{animationRunning}}" bindtap="exportPdf">{{text.exportPdf}}</button>
   </view>
+  <view class="file-export-hint preview-file-export-hint">{{text.fileExportHint}}</view>
 </view>

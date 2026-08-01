@@ -54,6 +54,7 @@
       <button bindtap="startRename">{{text.rename}}</button>
       <button bindtap="exportSelected">{{text.exportArchive}}</button>
       <button bindtap="shareSelected">{{text.shareArchive}}</button>
+      <view class="file-export-hint menu-file-export-hint">{{text.fileExportHint}}</view>
       <view class="divider"></view>
       <button class="danger-text" bindtap="deleteSelected">{{text.deleteArchive}}</button>
       <button bindtap="closeMenu">{{text.cancelAction}}</button>

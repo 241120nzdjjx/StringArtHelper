@@ -1,7 +1,7 @@
 <view class="page">
   <view class="panel about-hero">
     <view class="title">{{text.appName}}</view>
-    <view class="version">{{text.wechatEdition}} · v1.2.1</view>
+    <view class="version">{{text.wechatEdition}} · v1.2.2</view>
     <view class="about-copy">{{text.aboutIntro}}</view>
   </view>
 

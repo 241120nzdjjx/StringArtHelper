@@ -81,6 +81,7 @@ const homeJs = fs.readFileSync(path.join(root, 'pages', 'home', 'home.js'), 'utf
 const homeWxml = fs.readFileSync(path.join(root, 'pages', 'home', 'home.wxml'), 'utf8')
 const voiceInstaller = fs.readFileSync(path.join(root, 'tools', 'install-open-number-voices.ps1'), 'utf8')
 assert.ok(!previewJs.includes('ctx.clip()'), 'Thread endpoints must not be clipped at the nail circle')
+assert.ok(previewWxml.includes('text.fileExportHint'), 'TXT export area must explain the chat-forward download workflow')
 assert.ok(/THREAD_PATH_BATCH\s*=\s*32/.test(previewJs), 'Long thread paths must render in bounded batches')
 assert.ok(previewJs.includes('requestDraw()'), 'Interactive preview redraw must be frame-throttled')
 assert.ok(
@@ -161,6 +162,7 @@ assert.ok(projectsJs.includes('if (this.data.busy) return'), 'Project mutations 
 assert.ok(projectsJs.includes('wx.getImageInfo'), 'Imported thumbnails must be decoded before accepting SAR')
 assert.ok(projectsJs.includes("extension: ['sar', 'bin']"), 'Archive picker must accept both SAR extensions')
 assert.ok(projectsWxml.includes('text.fileImportHint'), 'Archive import entry must explain the chat-forward workflow')
+assert.ok(projectsWxml.includes('text.fileExportHint'), 'Archive export menu must explain the chat-forward download workflow')
 assert.ok(projectsWxml.includes('text.autoResume') && projectsWxml.includes('text.manualArchives'))
 assert.ok(projectsWxml.includes('item.isCurrent') && storageJs.includes('b.updatedAt - a.updatedAt'))
 assert.ok(

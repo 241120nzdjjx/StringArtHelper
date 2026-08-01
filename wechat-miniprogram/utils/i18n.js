@@ -1,10 +1,11 @@
 const ZH = {
   appName: '绕线助手',
-  versionLabel: '微信小程序版 · v1.2.1',
+  versionLabel: '微信小程序版 · v1.2.2',
   tagline: '免费 · 开源 · 纯本地运行',
   chooseImage: '选择图片并生成',
   importTxt: '导入 TXT / SAR 存档',
   fileImportHint: '上传 TXT 和 BIN 文件，需先转发至聊天，再从聊天上传。',
+  fileExportHint: '下载 TXT 和 BIN 文件，需先转发至聊天，再从聊天下载。',
   continueProject: '继续当前项目',
   projects: '存档管理',
   about: '关于',
@@ -128,11 +129,12 @@ const ZH = {
 
 const EN = {
   appName: 'String Art Helper',
-  versionLabel: 'WeChat Mini Program · v1.2.1',
+  versionLabel: 'WeChat Mini Program · v1.2.2',
   tagline: 'Free · open source · fully offline',
   chooseImage: 'Choose image and generate',
   importTxt: 'Import TXT / SAR archive',
   fileImportHint: 'To upload TXT or BIN files, first forward them to a chat, then choose them from that chat.',
+  fileExportHint: 'To download TXT or BIN files, first forward them to a chat, then download them from that chat.',
   continueProject: 'Continue current project',
   projects: 'Projects',
   about: 'About',
