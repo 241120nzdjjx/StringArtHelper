@@ -136,6 +136,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     private static final String X_URL = "https://x.com/nzdjjx241120";
     private static final String TELEGRAM_URL = "https://t.me/nzdjjx";
     private static final String GITHUB_URL = "https://github.com/241120nzdjjx/StringArtHelper";
+    private static final String WECHAT_MINIPROGRAM_LINK = "#小程序://绕线画助手/3BsgpZwfWylWK9d";
 
     private static final String PREFS = "string_art_reader_v2";
     private static final String KEY_SEQUENCE = "sequence";
@@ -1364,7 +1365,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
             return;
         }
         if (requestCode == REQUEST_OPEN_SAVE) {
-            importSaveFromUri(uri);
+            importSaveFromUri(uri, queryFileName(uri).toLowerCase(Locale.ROOT).endsWith(".bin"));
             return;
         }
         if (requestCode == REQUEST_OPEN_IMAGE) {
@@ -1386,7 +1387,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         String selectedName = queryFileName(uri);
         String lowerName = selectedName.toLowerCase(Locale.ROOT);
         if (lowerName.endsWith(".bin") || lowerName.endsWith(".sar")) {
-            importSaveFromUri(uri);
+            importSaveFromUri(uri, lowerName.endsWith(".bin"));
             return;
         }
         if (!lowerName.endsWith(".txt")) {
@@ -2041,6 +2042,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                 : "选择一张照片后，应用会完全在本机生成单色圆形绕线序列，并直接打开播报器。\n\n裁切页显示最终参与计算的圆形区域。默认会让整张图片完整进入圆内，图片以外的区域按白色处理；可拖动取景、双指限位缩放。钉号固定为 0 号正右、顺时针递增。");
         intro.setLineSpacing(dp(3), 1f);
         panel.addView(intro);
+
         new AlertDialog.Builder(this)
                 .setTitle(tr("图片生成绕线画"))
                 .setView(panel)
@@ -3246,15 +3248,60 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
     }
 
     private void showMiniProgramDialog() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(8), dp(22), dp(8));
+
         TextView message = dialogLabel(isEnglish()
                 ? "Don't want to download the Android app, or need to use String Art Helper on a non-Android device? Try our WeChat Mini Program.\n\nSearch WeChat for “绕线画助手”. Some screens and interactions differ, but the core features remain the same. .sar saves and TXT sequences can also be moved between the Android app and Mini Program."
                 : "不想下载应用，或想在非 Android 设备上使用？请试试我们的微信小程序版。\n\n在微信中搜索“绕线画助手”即可使用。部分界面与操作体验略有差别，但核心功能不变；.sar 存档和 TXT 序列也可以与 Android 版跨平台互通。");
         message.setTextSize(15f);
         message.setLineSpacing(dp(3), 1f);
-        message.setPadding(dp(22), dp(8), dp(22), dp(8));
+        panel.addView(message);
+
+        ImageView miniProgramCode = new ImageView(this);
+        miniProgramCode.setImageResource(R.drawable.wechat_miniprogram_code);
+        miniProgramCode.setAdjustViewBounds(true);
+        miniProgramCode.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        miniProgramCode.setContentDescription(isEnglish()
+                ? "String Art Helper WeChat Mini Program code"
+                : "绕线画助手微信小程序码");
+        LinearLayout.LayoutParams codeParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(240));
+        codeParams.setMargins(0, dp(10), 0, dp(6));
+        panel.addView(miniProgramCode, codeParams);
+
+        TextView link = dialogLabel(WECHAT_MINIPROGRAM_LINK);
+        link.setTextSize(12f);
+        link.setTextIsSelectable(true);
+        link.setGravity(Gravity.CENTER);
+        panel.addView(link);
+
+        Button copyLink = makeButton(isEnglish()
+                ? "Copy Mini Program command"
+                : "复制小程序口令");
+        copyLink.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                        getSystemService(CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                            "绕线画助手微信小程序", WECHAT_MINIPROGRAM_LINK));
+                    toast(tr("已复制"), Toast.LENGTH_SHORT);
+                }
+            }
+        });
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
+        copyParams.setMargins(0, dp(8), 0, 0);
+        panel.addView(copyLink, copyParams);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.addView(panel);
         new AlertDialog.Builder(this)
                 .setTitle("📱 " + tr("微信小程序版"))
-                .setView(message)
+                .setView(scroll)
                 .setPositiveButton(tr("知道了"), null)
                 .show();
     }
@@ -4394,7 +4441,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         }
     }
 
-    private void importSaveFromUri(Uri uri) {
+    private void importSaveFromUri(Uri uri, boolean openAfterImport) {
         File temporary = null;
         try {
             File cache = new File(getCacheDir(), "save_import");
@@ -4411,7 +4458,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
             }
             SaveRecord imported = readSave(temporary, true);
             validateImportedSave(imported);
-            showImportSaveDialog(imported);
+            showImportSaveDialog(imported, openAfterImport);
         } catch (IOException e) {
             showError("无法导入存档：" + safeMessage(e));
         } catch (RuntimeException e) {
@@ -4449,7 +4496,7 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         imported.thumbnailBytes = normalizeThumbnailToMonochrome(imported.thumbnailBytes);
     }
 
-    private void showImportSaveDialog(final SaveRecord imported) {
+    private void showImportSaveDialog(final SaveRecord imported, final boolean openAfterImport) {
         final SaveRecord duplicate = findManualSaveByName(imported.name);
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -4490,20 +4537,20 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                 .setView(panel)
                 .setNegativeButton(tr("取消"), null);
         if (duplicate == null) {
-            builder.setPositiveButton(tr("导入"), new DialogInterface.OnClickListener() {
+            builder.setPositiveButton(tr(openAfterImport ? "导入并打开" : "导入"), new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dialog, int which) {
-                    finishImportSave(imported, null, false);
+                    finishImportSave(imported, null, false, openAfterImport);
                 }
             });
         } else {
-            builder.setNeutralButton(tr("保留两份"), new DialogInterface.OnClickListener() {
+            builder.setNeutralButton(tr(openAfterImport ? "保留两份并打开" : "保留两份"), new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dialog, int which) {
-                    finishImportSave(imported, null, true);
+                    finishImportSave(imported, null, true, openAfterImport);
                 }
             });
-            builder.setPositiveButton(tr("覆盖同名存档"), new DialogInterface.OnClickListener() {
+            builder.setPositiveButton(tr(openAfterImport ? "覆盖并打开" : "覆盖同名存档"), new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dialog, int which) {
-                    finishImportSave(imported, duplicate.file, false);
+                    finishImportSave(imported, duplicate.file, false, openAfterImport);
                 }
             });
         }
@@ -4517,7 +4564,8 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
         return null;
     }
 
-    private void finishImportSave(SaveRecord imported, File overwrite, boolean makeUnique) {
+    private void finishImportSave(SaveRecord imported, File overwrite, boolean makeUnique,
+                                  boolean openAfterImport) {
         try {
             File target = overwrite != null ? overwrite
                     : new File(saveDirectory(), "save_" + System.currentTimeMillis() + ".sar");
@@ -4530,6 +4578,10 @@ public final class MainActivity extends Activity implements TextToSpeech.OnInitL
                     System.currentTimeMillis(), imported.values, imported.projectNails,
                     imported.projectCircleMm, imported.projectLineMm, thumbnail);
             refreshProjectManager();
+            if (openAfterImport) {
+                loadSave(target);
+                return;
+            }
             Toast.makeText(this, isEnglish()
                     ? "Imported: “" + localizedProjectLabel(name) + "”"
                     : "已导入：“" + name + "”", Toast.LENGTH_LONG).show();

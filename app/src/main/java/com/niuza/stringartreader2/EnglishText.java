@@ -55,7 +55,9 @@ final class EnglishText {
         put("导出存档", "Export save"); put("分享存档", "Share save");
         put("分享安装包", "Share APK");
         put("导入存档", "Import save"); put("保留两份", "Keep both");
+        put("保留两份并打开", "Keep both and open");
         put("覆盖同名存档", "Replace same-name save");
+        put("覆盖并打开", "Replace and open");
         put("删除这个存档", "Delete this save"); put("覆盖存档？", "Overwrite save?");
         put("重命名存档", "Rename save"); put("删除存档？", "Delete save?");
         put("删除存档失败", "Could not delete the save"); put("已删除", "Deleted");

@@ -24,7 +24,17 @@
 
 ## 微信小程序版
 
-不想下载应用，或需要在非 Android 设备上使用？在微信中搜索 **“绕线画助手”**，即可使用微信小程序版。
+不想下载应用，或需要在非 Android 设备上使用？使用微信扫描下方小程序码，或在微信中搜索 **“绕线画助手”**：
+
+<p align="center">
+  <img src="docs/images/wechat-miniprogram-code.png" alt="绕线画助手微信小程序码" width="320">
+</p>
+
+微信小程序入口（复制后在微信中打开）：
+
+```text
+#小程序://绕线画助手/3BsgpZwfWylWK9d
+```
 
 小程序版的部分界面和操作方式与 Android 版略有不同，但图片生成绕线序列、预览、播报、项目存档等核心功能保持一致。Android 版与微信小程序版可以互相导入、导出项目存档和 TXT 钉号序列，方便跨设备继续制作。
 
@@ -71,7 +81,7 @@ GitHub Actions 会对公开源码执行 Debug 与未签名 Release 构建，并�
 
 ## 项目信息
 
-- 当前正式版本：`26.3.4`（versionCode 60）
+- 当前正式版本：`26.3.5`（versionCode 61）
 - 最低 Android：8.0（API 26）
 - 目标 Android：API 35
 - 许可证：GNU GPL v3.0 only，另有兼容的第 7 条附加条款
@@ -88,6 +98,6 @@ GitHub Actions 会对公开源码执行 Debug 与未签名 Release 构建，并�
 - 邮箱：241120nzdjjx@gmail.com
 - X：[@nzdjjx241120](https://x.com/nzdjjx241120)
 - Telegram：[@nzdjjx](https://t.me/nzdjjx)
-- 微信小程序：微信搜索 **“绕线画助手”**
+- 微信小程序：微信搜索 **“绕线画助手”**，或复制 `#小程序://绕线画助手/3BsgpZwfWylWK9d` 后在微信中打开
 
 普通问题可使用 GitHub Issues；安全问题请阅读 [SECURITY.md](SECURITY.md)。
