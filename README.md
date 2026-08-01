@@ -110,7 +110,6 @@ npm test
 ## 项目信息
 
 - 当前正式版本：`26.3.5`（versionCode 61）
-- 微信小程序版本：`1.2.1`
 - 最低 Android：8.0（API 26）
 - 目标 Android：API 35
 - 许可证：GNU GPL v3.0 only，另有兼容的第 7 条附加条款
