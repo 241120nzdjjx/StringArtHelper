@@ -42,7 +42,8 @@
 
 > 所有生成与项目数据仍在设备本地处理；实际可用能力可能受微信小程序平台限制。
 
-小程序源码、开发者工具导入方法、平台限制和测试说明见 [`wechat-miniprogram/`](wechat-miniprogram/)。
+开发者工具导入方法、平台限制和测试等详细说明见 [`wechat-miniprogram/WeChat-Miniprogram-README.md`](wechat-miniprogram/WeChat-Miniprogram-README.md)。
+小程序源码见 [`wechat-miniprogram/`](wechat-miniprogram/)。
 
 ## 隐私
 
