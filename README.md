@@ -42,7 +42,7 @@
 
 > 所有生成与项目数据仍在设备本地处理；实际可用能力可能受微信小程序平台限制。
 
-开发者工具导入方法、平台限制和测试等详细说明见 [`wechat-miniprogram/StringArtHelper-WeChat-Miniprogram-README.md`](wechat-miniprogram/StringArtHelper-WeChat-Miniprogram-README.md)。
+开发者工具导入方法、平台限制和测试等详细说明见 [`wechat-miniprogram/README.md`](wechat-miniprogram/README.md)。
 小程序源码见 [`wechat-miniprogram/`](wechat-miniprogram/)。
 
 ## 隐私
