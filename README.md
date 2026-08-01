@@ -36,9 +36,15 @@
 #小程序://绕线画助手/3BsgpZwfWylWK9d
 ```
 
+或微信内搜索：绕线画助手
+
 小程序版的部分界面和操作方式与 Android 版略有不同，但图片生成绕线序列、预览、播报、项目存档等核心功能保持一致。Android 版与微信小程序版可以互相导入、导出项目存档和 TXT 钉号序列，方便跨设备继续制作。
 
 > 所有生成与项目数据仍在设备本地处理；实际可用能力可能受微信小程序平台限制。
+
+![绕线画助手小程序码](docs/images/wechat-miniprogram-code.png)
+
+源码位于 [`wechat-miniprogram/`](wechat-miniprogram/)。
 
 ## 隐私
 
