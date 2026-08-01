@@ -1,0 +1,30 @@
+.preview-row {
+  display: flex;
+  gap: 22rpx;
+  align-items: center;
+}
+
+.crop-preview {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 18rpx;
+  background: #fff;
+}
+
+.switch-row {
+  margin: 28rpx 0 16rpx;
+  min-height: 64rpx;
+}
+
+.progress-text {
+  margin-top: 16rpx;
+}
+
+.target-canvas {
+  position: fixed;
+  left: -300px;
+  top: -300px;
+  width: 192px;
+  height: 192px;
+  pointer-events: none;
+}

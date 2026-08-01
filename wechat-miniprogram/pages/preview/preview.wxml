@@ -1,0 +1,56 @@
+<view class="page">
+  <view class="panel info-panel">
+    <view class="section-title">{{text.previewTitle}}</view>
+    <view class="subtitle">
+      {{params.nails}} {{text.nailUnit}} · {{sequenceCount - 1}} {{text.steps}}
+    </view>
+    <view class="subtitle">
+      Ø {{params.circleMm}} mm · {{params.lineMm}} mm · {{threadMeters}} m
+    </view>
+  </view>
+
+  <view class="canvas-wrap" style="width:{{canvasSize}}px;height:{{canvasSize}}px;">
+    <canvas
+      type="2d"
+      id="previewCanvas"
+      class="preview-canvas"
+      style="width:{{canvasSize}}px;height:{{canvasSize}}px;"
+      bindtouchstart="onTouchStart"
+      bindtouchmove="onTouchMove"
+      bindtouchend="onTouchEnd"
+      bindtouchcancel="onTouchEnd"
+    />
+  </view>
+
+  <view class="panel controls">
+    <view class="row">
+      <text class="grow">{{text.actualRatio}}</text>
+      <switch checked="{{actualRatio}}" disabled="{{animationRunning}}"
+        color="#9769ff" bindchange="onActualRatio" />
+    </view>
+    <label class="label">{{text.previewThread}} · {{displayLineMm}} mm</label>
+    <slider min="1" max="100" step="1" value="{{lineSlider}}"
+      disabled="{{animationRunning}}" activeColor="#9769ff"
+      bindchanging="onLineSlider" bindchange="onLineSlider" />
+
+    <label class="label">{{text.zoom}} · {{zoomLabel}}</label>
+    <slider min="100" max="500" step="5" value="{{zoomSlider}}"
+      disabled="{{animationRunning}}" activeColor="#9769ff"
+      bindchanging="onZoomSlider" bindchange="onZoomSlider" />
+
+    <label class="label">{{text.animationSpeed}} · {{animationSpeed}}</label>
+    <slider min="1" max="20" step="1" value="{{animationSpeed}}"
+      activeColor="#9769ff" bindchanging="onSpeed" bindchange="onSpeed" />
+
+    <button class="{{animationRunning ? 'danger' : 'primary'}}" bindtap="toggleAnimation">
+      {{animationRunning ? text.stopAnimation : text.playAnimation}}
+    </button>
+  </view>
+
+  <view class="button-grid">
+    <button class="primary" disabled="{{animationRunning}}" bindtap="openReader">{{text.openReader}}</button>
+    <button class="secondary" disabled="{{animationRunning}}" bindtap="saveProject">{{text.saveProject}}</button>
+    <button class="secondary" disabled="{{animationRunning}}" bindtap="exportTxt">{{text.exportTxt}}</button>
+    <button class="secondary" disabled="{{animationRunning}}" bindtap="exportPdf">{{text.exportPdf}}</button>
+  </view>
+</view>

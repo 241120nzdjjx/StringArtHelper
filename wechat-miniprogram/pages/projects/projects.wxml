@@ -1,0 +1,83 @@
+<view class="page">
+  <view class="title">{{text.projectsTitle}}</view>
+  <view class="explain">{{text.projectHelp}}</view>
+
+  <view class="panel current-panel">
+    <view class="section-title">{{text.currentProject}}</view>
+    <block wx:if="{{current}}">
+      <view class="project-name">{{current.name}}</view>
+      <view class="subtitle">{{current.index + 1}} / {{current.sequenceCount}} {{text.steps}}</view>
+      <view class="meta">{{current.params.nails}} {{text.nailUnit}} · {{text.circleShort}} {{current.params.circleMm}} mm · {{text.threadShort}} {{current.params.lineMm}} mm</view>
+    </block>
+    <view wx:else class="muted">{{text.noCurrentProject}}</view>
+  </view>
+
+  <view class="button-grid top-actions">
+    <button class="primary" disabled="{{!current || busy}}" bindtap="startSaveCurrent">{{text.saveCheckpoint}}</button>
+    <button class="secondary" disabled="{{busy}}" bindtap="importSar">{{text.importArchive}}</button>
+  </view>
+  <view class="file-import-hint project-import-hint">{{text.fileImportHint}}</view>
+
+  <view class="group-title">{{text.autoResume}}</view>
+  <view wx:if="{{!autos.length}}" class="empty">{{text.emptyAuto}}</view>
+  <view wx:for="{{autos}}" wx:key="id" class="project-card" data-id="{{item.id}}" bindtap="openProject">
+    <image wx:if="{{item.thumbnailPath}}" class="thumb" src="{{item.thumbnailPath}}" mode="aspectFill" />
+    <view wx:else class="thumb placeholder">◯</view>
+    <view class="card-body">
+      <view class="name-row"><view class="project-name ellipsis">{{item.name}}</view><view wx:if="{{item.isCurrent}}" class="current-tag">{{text.currentBadge}}</view></view>
+      <view class="subtitle">{{item.stepText}} {{text.steps}}</view>
+      <view class="meta">{{item.nails}} {{text.nailUnit}} · {{text.circleShort}} {{item.circleMm}} mm · {{text.threadShort}} {{item.lineMm}} mm</view>
+      <view class="date">{{item.dateText}}</view>
+    </view>
+    <button class="more" catchtap="showMenu" data-id="{{item.id}}">⋮</button>
+  </view>
+
+  <view class="group-title">{{text.manualArchives}}</view>
+  <view wx:if="{{!manuals.length}}" class="empty">{{text.emptyManual}}</view>
+  <view wx:for="{{manuals}}" wx:key="id" class="project-card" data-id="{{item.id}}" bindtap="openProject">
+    <image wx:if="{{item.thumbnailPath}}" class="thumb" src="{{item.thumbnailPath}}" mode="aspectFill" />
+    <view wx:else class="thumb placeholder">◯</view>
+    <view class="card-body">
+      <view class="project-name ellipsis">{{item.name}}</view>
+      <view class="subtitle">{{item.stepText}} {{text.steps}}</view>
+      <view class="meta">{{item.nails}} {{text.nailUnit}} · {{text.circleShort}} {{item.circleMm}} mm · {{text.threadShort}} {{item.lineMm}} mm</view>
+      <view class="date">{{item.dateText}}</view>
+    </view>
+    <button class="more" catchtap="showMenu" data-id="{{item.id}}">⋮</button>
+  </view>
+
+  <view wx:if="{{menuProject}}" class="overlay" catchtap="closeMenu">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-title ellipsis">{{menuProject.name}}</view>
+      <button bindtap="menuOpen">{{text.readArchive}}</button>
+      <button bindtap="overwriteSelected" disabled="{{!current}}">{{text.overwriteProgress}}</button>
+      <button bindtap="startRename">{{text.rename}}</button>
+      <button bindtap="exportSelected">{{text.exportArchive}}</button>
+      <button bindtap="shareSelected">{{text.shareArchive}}</button>
+      <view class="divider"></view>
+      <button class="danger-text" bindtap="deleteSelected">{{text.deleteArchive}}</button>
+      <button bindtap="closeMenu">{{text.cancelAction}}</button>
+    </view>
+  </view>
+
+  <view wx:if="{{editMode}}" class="overlay">
+    <view class="dialog">
+      <view class="sheet-title">{{editMode === 'save' ? text.saveCheckpointTitle : text.rename}}</view>
+      <input class="input" focus="{{true}}" value="{{editValue}}" maxlength="200" selection-start="0" selection-end="{{editValue.length}}" bindinput="onEditInput" />
+      <view class="button-grid dialog-buttons"><button class="secondary" bindtap="cancelEdit">{{text.cancelAction}}</button><button class="primary" disabled="{{busy}}" bindtap="confirmEdit">{{text.saveAction}}</button></view>
+    </view>
+  </view>
+
+  <view wx:if="{{importProject}}" class="overlay">
+    <view class="dialog import-dialog">
+      <view class="sheet-title">{{text.importArchiveTitle}}</view>
+      <view class="project-name">{{importProject.name}}</view>
+      <view class="subtitle">{{importProject.index + 1}} / {{importProject.sequence.length}} {{text.steps}}</view>
+      <view class="meta">{{importProject.params.nails}} {{text.nailUnit}} · {{text.circleShort}} {{importProject.params.circleMm}} mm · {{text.threadShort}} {{importProject.params.lineMm}} mm</view>
+      <view wx:if="{{importProject.magic === 'SAR2'}}" class="warning">{{text.sar2Warning}}</view>
+      <block wx:if="{{importHasConflict}}"><button class="primary" bindtap="overwriteImport">{{text.overwriteSame}}</button><button class="secondary" bindtap="keepBothImport">{{text.keepBoth}}</button></block>
+      <button wx:else class="primary" bindtap="confirmImport">{{text.importAction}}</button>
+      <button class="secondary" bindtap="cancelImport">{{text.cancelAction}}</button>
+    </view>
+  </view>
+</view>

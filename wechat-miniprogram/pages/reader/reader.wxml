@@ -1,0 +1,109 @@
+<view class="reader-page">
+  <view class="reader-header">
+    <view class="reader-name">{{current.name}}</view>
+    <view class="subtitle">{{index + 1}} / {{sequenceCount}}</view>
+  </view>
+
+  <view class="number-stage">
+    <view class="side-number">
+      <text class="number-label">{{text.previousPin}}</text>
+      <text class="number-value">{{previousValue}}</text>
+    </view>
+    <view class="current-number">
+      <text class="number-label">{{text.current}}</text>
+      <text class="current-value">{{currentValue}}</text>
+    </view>
+    <view class="side-number">
+      <text class="number-label">{{text.nextPin}}</text>
+      <text class="number-value">{{nextValue}}</text>
+    </view>
+  </view>
+
+  <view class="progress-wrap">
+    <progress percent="{{progress}}" activeColor="#9769ff" stroke-width="7" />
+  </view>
+
+  <view class="reader-controls">
+    <view class="button-grid three">
+      <button class="secondary" bindtap="previous" disabled="{{index <= 0}}">{{text.previous}}</button>
+      <button class="{{playing ? 'danger' : 'primary'}}" bindtap="togglePlay">
+        {{playing ? text.pause : text.play}}
+      </button>
+      <button class="secondary" bindtap="next" disabled="{{index >= sequenceCount - 1}}">{{text.next}}</button>
+    </view>
+
+    <view class="row jump-row">
+      <input class="input grow" type="number" value="{{jumpValue}}" bindinput="onJumpInput"
+        placeholder="{{text.jump}}" />
+      <button class="secondary jump-button" bindtap="jump">{{text.jump}}</button>
+    </view>
+
+    <label class="label">{{text.stepInterval}} · {{delayLabel}}</label>
+    <slider min="5" max="50" step="1" value="{{delayStep}}" activeColor="#9769ff"
+      bindchanging="onDelay" bindchange="onDelay" />
+
+    <view class="row switch-row">
+      <text class="grow">{{text.offlineVoice}}</text>
+      <switch checked="{{voiceEnabled}}" disabled="{{!voiceSupported}}"
+        color="#9769ff" bindchange="onVoice" />
+    </view>
+    <view class="subtitle tts-note">
+      {{voiceSupported ? text.voiceReady : text.voiceUnsupported}}
+    </view>
+    <label class="label">{{text.voiceSpeed}} · {{voiceRateLabel}}</label>
+    <slider min="75" max="160" step="5" value="{{voiceRateStep}}"
+      disabled="{{!voiceSupported}}" activeColor="#9769ff"
+      bindchanging="onVoiceRate" bindchange="onVoiceRate" />
+    <view class="button-grid">
+      <button class="secondary" bindtap="openReaderPreview">{{text.readerCombinedPreview}}</button>
+      <button class="secondary" bindtap="openProjects">{{text.projects}}</button>
+    </view>
+  </view>
+
+  <view wx:if="{{readerPreviewOpen}}" class="reader-preview-fullscreen">
+    <view class="reader-preview-fullbar" style="width:{{canvasSize}}px;">
+      <text class="grow">{{text.realtimePreview}}</text>
+      <button class="preview-tool-button" bindtap="closeReaderPreview"
+        aria-label="{{text.minimize}}">—</button>
+    </view>
+    <canvas type="2d" id="readerPreviewCanvas" class="reader-preview-canvas full"
+      style="width:{{canvasSize}}px;height:{{canvasSize}}px;" />
+    <view class="reader-preview-animation-controls" style="width:{{canvasSize}}px;">
+      <view class="reader-preview-number-stage">
+        <view class="reader-preview-number side">
+          <text class="reader-preview-number-label">{{text.previousPinShort}}</text>
+          <text class="reader-preview-number-value">{{previousValue}}</text>
+        </view>
+        <view class="reader-preview-number current">
+          <text class="reader-preview-number-label">{{text.currentShort}}</text>
+          <text class="reader-preview-number-value">{{currentValue}}</text>
+        </view>
+        <view class="reader-preview-number side">
+          <text class="reader-preview-number-label">{{text.nextPinShort}}</text>
+          <text class="reader-preview-number-value">{{nextValue}}</text>
+        </view>
+      </view>
+      <view class="reader-preview-step-count">{{index + 1}} / {{sequenceCount}}</view>
+      <view class="reader-preview-step-controls">
+        <button class="secondary" bindtap="previous"
+          disabled="{{previewAnimationRunning || index <= 0}}">{{text.previousShort}}</button>
+        <button class="secondary" bindtap="next"
+          disabled="{{previewAnimationRunning || index >= sequenceCount - 1}}">{{text.nextShort}}</button>
+      </view>
+      <view class="reader-preview-jump-controls">
+        <input class="input" type="number" value="{{jumpValue}}" bindinput="onJumpInput"
+          disabled="{{previewAnimationRunning}}" placeholder="1-{{sequenceCount}}" />
+        <button class="secondary" bindtap="jump"
+          disabled="{{previewAnimationRunning}}">{{text.jump}}</button>
+      </view>
+      <label class="label">{{text.animationSpeed}} · {{previewAnimationSpeed}}</label>
+      <slider min="1" max="20" step="1" value="{{previewAnimationSpeed}}"
+        activeColor="#9769ff" bindchanging="onPreviewAnimationSpeed"
+        bindchange="onPreviewAnimationSpeed" />
+      <button class="{{previewAnimationRunning ? 'danger' : 'primary'}}"
+        bindtap="toggleReaderPreviewAnimation">
+        {{previewAnimationRunning ? text.stopAnimation : text.playAnimation}}
+      </button>
+    </view>
+  </view>
+</view>

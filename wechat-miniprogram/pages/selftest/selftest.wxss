@@ -1,0 +1,36 @@
+.selftest {
+  padding-bottom: 32rpx;
+}
+
+.check-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 14rpx 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.check-name {
+  color: #f2f2f7;
+}
+
+.pass {
+  color: #56d68a;
+}
+
+.fail {
+  color: #ff6b6b;
+}
+
+.test-canvas {
+  width: 64px;
+  height: 64px;
+  position: fixed;
+  left: -200px;
+  top: -200px;
+}
+
+.summary {
+  font-weight: 700;
+  text-align: center;
+}

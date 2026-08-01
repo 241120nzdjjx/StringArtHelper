@@ -1,0 +1,18 @@
+.info-panel {
+  margin-bottom: 16rpx;
+}
+
+.canvas-wrap {
+  margin: 0 auto 20rpx;
+  background: #f8f7fb;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.preview-canvas {
+  display: block;
+}
+
+.controls .row {
+  min-height: 68rpx;
+}
