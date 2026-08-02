@@ -149,154 +149,150 @@ Android StringArtHelper 的源码、版本记录和发布信息：
 
 ---
 
-# StringArtHelper
+# StringArtHelper | WeChat Mini Program
 
-A free, open-source, ad-free string art creation tool whose core features run entirely on the local device. It is available as an Android app and a WeChat Mini Program.
+> Due to the WeChat Mini Program review process, the source code in this repository may be newer than the version currently available online. For actual use, refer to the version published on WeChat.
 
-From image cropping, string-path generation, and pin-template creation to step-by-step previews, voice guidance, and project saves, all processing is performed locally. TXT sequences and project save files can be transferred between the Android app and the WeChat Mini Program, allowing work to continue across devices.
+A free, open-source string art generation and creation assistant that runs entirely on the local device.
 
-## Main Features of the Android App
+Current version: **v1.2.2**
 
-- Local image cropping with edge snapping and a black-and-white preview of the final selected area
-- Local path generation for 100–500 pins and up to 20,000 string segments
-- Pin-circle diameters from 80 to 1,200 mm, with a reminder to leave at least 10 mm of board space on every side
-- Step-by-step visualization of the generation process at animation speeds from 1× to 20×
-- Adjustable pin count, maximum string segment count, pin-circle diameter, string diameter, and automatic over-darkening prevention
-- A unified Import entry that automatically recognizes TXT pin sequences and `.bin` or `.sar` project saves
-- TXT sequence import and export, with offline number voice guidance in Chinese and English
-- Optional temporary audio ducking of other Android media during voice guidance
-- Step control using volume buttons, Bluetooth headsets, and media buttons
-- Dynamic remaining-time estimates based on the number of steps left and the actual working pace
-- A real-time preview that can be zoomed, panned, minimized, and displayed in full screen
-- Purple highlighting for the current string segment, with optional true-scale rendering based on the physical string diameter
-- Automatic progress recovery and manual snapshots; `.bin` and `.sar` saves can be imported, while projects are exported and shared in `.sar` format
-- Automatic generation of A4 tiled pin templates using the minimum required number of pages, including cutting lines, alignment marks, and a 100 mm calibration ruler
+## Main Features
+
+- Generate string art pin paths from images
+- Grayscale preprocessing, circular cropping, dragging, and two-finger zooming
+- Support for 100–500 pins
+- Custom maximum string segment count, string diameter, and pin-circle diameter
+- Automatic prevention of excessively dark results
+- Generation-process animation and final-result preview
+- Real-time preview of the current stringing progress
+- Previous step, next step, step jump, and automatic playback
+- Display of the previous, current, and next pin numbers
+- Offline number voice guidance in Chinese and English
+- Automatic progress recovery and manual project saves
+- Import and export of SAR project saves compatible with the Android app
+- Import and export of TXT stringing sequences containing physical parameters
+- Generation of A4 PDF pin templates at true physical dimensions in millimetres
 - Chinese and English interfaces with portrait and landscape support
-- Sharing of the currently installed APK with other users
 
-## WeChat Mini Program
+## Privacy and Offline Operation
 
-> Due to the WeChat Mini Program review process, the Mini Program source code in this repository may be newer than the version currently available online. For actual use, refer to the version published on WeChat.
+StringArtHelper does not depend on a server.
 
-If you do not want to install the Android app, or need to use StringArtHelper on a non-Android device, scan the Mini Program code below with WeChat or search for **“绕线画助手”** in WeChat:
+Image processing, path calculation, project saves, and voice guidance are all performed locally. The Mini Program does not actively upload selected images, stringing sequences, or project-save contents.
 
-<p align="center">
-  <img src="docs/images/wechat-miniprogram-code.png" alt="StringArtHelper WeChat Mini Program code" width="320">
-</p>
+## File Import and Export
 
-WeChat Mini Program entry text—copy it and open it inside WeChat:
+Supported import formats:
 
-```text
-#小程序://绕线画助手/3BsgpZwfWylWK9d
-```
+- `.txt`: string art pin-number sequences
+- `.sar`: StringArtHelper project saves
+- `.bin`: compatible project saves containing the same data as SAR files
 
-Some screens and interactions differ slightly from the Android app, but the core features—including image-to-path generation, previews, voice guidance, project saves, and PDF pin templates—remain available.
+Because of WeChat platform restrictions when selecting non-image files:
 
-The Android app and WeChat Mini Program can import and export compatible `.bin` or `.sar` project saves and TXT pin sequences, making it possible to continue a project on another device.
+> To upload a TXT or BIN file, first forward it to a WeChat chat, then select it from Chat Files.
 
-Because of WeChat platform restrictions, TXT and BIN files must first be forwarded to a WeChat chat before they can be selected and uploaded from Chat Files.
+To save an exported file to the device:
 
-> All generation and project data is still processed locally on the device. Some capabilities may be limited by the WeChat Mini Program platform.
+> To download a TXT or BIN file, first forward it to a WeChat chat, then download it from the chat.
 
-For instructions on importing the project into WeChat DevTools, platform limitations, and testing, see [`wechat-miniprogram/README.md`](wechat-miniprogram/README.md).
+## TXT Format
 
-The Mini Program source code is located in [`wechat-miniprogram/`](wechat-miniprogram/).
+TXT files officially exported by StringArtHelper contain:
 
-## Privacy
+- Pin count
+- String diameter
+- Pin-circle diameter
+- Complete pin-number sequence
 
-The Android app does not request network access and contains no advertising or analytics SDKs. The WeChat Mini Program does not use WeChat Cloud Development, a project-operated server, or network requests.
-
-Images, TXT sequences, and project saves are processed only on the local device and are not uploaded by this project. Android system cloud backup is disabled.
-
-When you open GitHub, Bilibili, X, Telegram, an email address, or a third-party string art generation website, the request is handed over to the corresponding external app, WeChat, or web browser.
-
-See [PRIVACY.md](PRIVACY.md) for details.
-
-## Download and Verification
-
-Download the official APK from the **Releases** page of this repository.
-
-Android package name:
+Example:
 
 ```text
-com.niuza.stringartreader2
+# StringArtHelper export
+# Pin count: 300
+# String diameter: 0.20 mm
+# Pin-circle diameter: 260 mm
+# Pin numbering: Pin 0 is at the rightmost point; numbers increase clockwise
+# Total pin entries: 5001
+
+0 → 87 → 162 → 39 → 204 → 11
 ```
 
-SHA-256 fingerprint of the official Android signing certificate:
+The importer also accepts common formats that use spaces, commas, line breaks, arrows, or numbered steps.
 
-```text
-6A:06:8C:3D:40:95:25:1F:E7:1D:00:09:FC:06:51:30:C5:E6:62:BA:32:97:ED:A8:C3:8F:CE:94:CA:70:76:4F
-```
+## SAR Project-Save Compatibility
 
-Android permits an existing installation to be updated only when both the package name and signing certificate match. The About page in the app also displays the signing-certificate fingerprint of the currently installed APK.
+The Mini Program can read:
 
-## Source Code Structure
+- SAR2
+- SAR3
+- SAR4
 
-```text
-StringArtHelper/
-├── app/                    Android application source code
-├── wechat-miniprogram/     WeChat Mini Program source code
-├── docs/                   Release, signing, and image resources
-└── .github/workflows/      Android automated build workflows
-```
+The official export format is SAR4, which is compatible with the Android version of StringArtHelper.
 
-## Building and Testing
+A project save contains:
 
-### Android
+- Project name
+- Current progress
+- Pin count
+- Pin-circle diameter
+- String diameter
+- Thumbnail
+- Complete pin-number sequence
+
+## PDF Pin Templates
+
+PDF pin templates are generated at true physical dimensions in millimetres. Large templates are automatically divided across multiple pages for assembly.
+
+When printing, select:
+
+> Actual size / 100%
+
+Do not select “Fit to page” or any automatic scaling option. After printing, use the 100 mm calibration ruler included in the PDF to verify the scale.
+
+## Project Management
+
+There are two types of project saves:
+
+- **Automatic progress recovery:** continuously records the latest progress of the current project
+- **Manual save:** a fixed snapshot created by the user that is not overwritten by later progress
+
+If you load a manual save and continue working, a new automatic recovery project is created. The original manual save remains unchanged.
+
+## Development and Testing
+
+This is a native WeChat Mini Program project and can be opened directly in WeChat DevTools.
 
 Requirements:
 
-- JDK 17
-- Gradle 8.9
-- Android Gradle Plugin 8.7.3
-- Android SDK 35 / Build Tools 35.0.0
+- WeChat DevTools
+- A WeChat base library supporting Canvas 2D, Workers, and local file APIs
+- Node.js, required only for automated tests
+
+Run the tests with:
 
 ```bash
-gradle --no-daemon :app:assembleDebug
-```
-
-GitHub Actions builds Debug and unsigned Release APKs from the public source code and uploads them as workflow artifacts.
-
-Official APKs must be signed using the author's official signing key, which is stored offline. The private key and its passwords are never included in the repository or CI environment.
-
-### WeChat Mini Program
-
-Import the [`wechat-miniprogram/`](wechat-miniprogram/) directory directly into WeChat DevTools.
-
-Node.js is required only for automated tests:
-
-```bash
-cd wechat-miniprogram
 npm test
 ```
 
-The Mini Program does not use WeChat Cloud Development or a project-operated server.
+The project does not depend on a remote server and does not require a backend address.
 
-Automated tests cover the core generation algorithm, TXT and SAR2/3/4 parsing, file-based project saves and migration, crop-edge snapping, and static checks of important pages. Album selection, camera access, Chat Files selection, and file sharing must still be verified on a physical device running WeChat.
+## Android Version
 
-See [CHANGELOG.md](CHANGELOG.md) for the version history and [docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md) for signing and official release instructions.
+Source code, version history, and release information for the Android version of StringArtHelper:
 
-## Project Information
-
-- Current official Android version: `26.3.5` (`versionCode 61`)
-- Minimum Android version: Android 8.0 (API 26)
-- Target Android API level: API 35
-- License: GNU GPL v3.0 only, with compatible additional terms under Section 7
-- Author: 牛杂の经济学
-
-Version numbers are based on the year. Releases made in 2026 use the `26.x.x` series. Feature updates increment the minor version, bug-fix updates increment the patch version, and Android `versionCode` values increase independently.
-
-Modified versions must provide the corresponding source code, preserve reasonable attribution, and be clearly identified as modified. They must not be presented as official builds.
-
-See [LICENSE](LICENSE) and [ADDITIONAL_TERMS.md](ADDITIONAL_TERMS.md) for details.
+[GitHub: StringArtHelper](https://github.com/241120nzdjjx/StringArtHelper)
 
 ## Feedback and Contact
 
-- GitHub: [241120nzdjjx/StringArtHelper](https://github.com/241120nzdjjx/StringArtHelper)
-- Bilibili: [牛杂の经济学](https://b23.tv/K3Cp0ZZ)
-- Email: 241120nzdjjx@gmail.com
-- X: [@nzdjjx241120](https://x.com/nzdjjx241120)
-- Telegram: [@nzdjjx](https://t.me/nzdjjx)
-- WeChat Mini Program: search for **“绕线画助手”** in WeChat, or copy `#小程序://绕线画助手/3BsgpZwfWylWK9d` and open it inside WeChat
+If you have a suggestion, encounter a problem, or find any part of the Mini Program difficult to use, feel free to get in touch:
 
-For general questions, use GitHub Issues. For security-related matters, read [SECURITY.md](SECURITY.md).
+- Email: 241120nzdjjx@gmail.com
+- [Bilibili](https://b23.tv/K3Cp0ZZ)
+
+## Open-Source License
+
+This project is released under the [GNU General Public License v3.0](../LICENSE).
+
+You may use, study, modify, and distribute the source code under the terms of the license. When distributing a modified version, you must comply with the open-source obligations of GPL v3.0 and preserve the original license and copyright notices.
