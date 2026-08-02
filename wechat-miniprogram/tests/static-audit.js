@@ -135,6 +135,10 @@ assert.ok(
   readerJs.includes('manualSpeakSession') && readerJs.includes('session === this.manualSpeakSession'),
   'Rapid synchronized stepping must not let an older voice completion clear the new speaking state'
 )
+assert.ok(
+  /\.reader-preview-step-controls button\s*\{[\s\S]*?flex:\s*1 1 0[\s\S]*?width:\s*0[\s\S]*?max-width:\s*calc\(50% - 6rpx\)/.test(readerWxss),
+  'Reader preview step buttons must be forced into two shrinkable equal-width columns'
+)
 assert.ok(readerWxml.includes('readerPreviewOpen') &&
   readerWxml.includes('bindtap="openReaderPreview"') &&
   readerWxml.includes('bindtap="closeReaderPreview"'),
