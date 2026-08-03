@@ -1,3 +1,7 @@
+<p align="center">
+  <strong>简体中文</strong> | <a href="./CHANGELOG.en.md">English</a>
+</p>
+
 # 更新记录
 
 本文件记录 Android 正式版的主要变化。完整提交历史请查看 GitHub 仓库。

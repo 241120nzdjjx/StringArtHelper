@@ -34,3 +34,42 @@ com.niuza.stringartreader2
 ## 修改版
 
 修改版可以依据 GPLv3 使用和分发，但必须提供对应源码、保留合理法律声明、明确标注修改，并且不得冒充官方构建。详见 [ADDITIONAL_TERMS.md](ADDITIONAL_TERMS.md)。
+
+---
+
+# Security, Authenticity, and Unofficial Builds
+
+## Verifying Official Builds
+
+Official Android application ID:
+
+```text
+com.niuza.stringartreader2
+```
+
+SHA-256 fingerprint of the official release certificate:
+
+```text
+6A:06:8C:3D:40:95:25:1F:E7:1D:00:09:FC:06:51:30:C5:E6:62:BA:32:97:ED:A8:C3:8F:CE:94:CA:70:76:4F
+```
+
+The in-app About page displays the signing-certificate fingerprint of the installed APK. Artifacts produced by GitHub Actions are intended to verify that the public source code can be built and are not signed with the official release certificate. Download official APKs from Releases.
+
+## Supported Versions
+
+Security fixes are prioritized for the latest version. When reporting an issue, please include:
+
+- The app version and Android version
+- Steps to reproduce the issue
+- The actual and expected results
+- Any necessary screenshots or sample files, with personal information removed first
+
+## Privately Reporting a Security Issue
+
+Do not post directly exploitable vulnerabilities or private files in a public Issue. Send reports to:
+
+`241120nzdjjx@gmail.com`
+
+## Modified Builds
+
+Modified versions may be used and distributed under GPLv3, but they must provide the corresponding source code, preserve reasonable legal notices, clearly identify themselves as modified, and must not impersonate official builds. See [ADDITIONAL_TERMS.md](ADDITIONAL_TERMS.md).
