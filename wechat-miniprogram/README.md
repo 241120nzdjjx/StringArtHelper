@@ -146,6 +146,8 @@ Android StringArtHelper 的源码、版本记录和发布信息：
 
 ## 开源许可
 
-本项目按照 [GNU General Public License v3.0](../LICENSE) 发布。
+本项目原创代码按照 [GNU General Public License v3.0](../LICENSE) 发布，并附带兼容的第 7 条附加条款。
+
+内置第三方代码及语音素材采用各自的许可证，不因收录于本项目而改为 GPL。完整来源、作者和许可证信息请参阅 [NOTICE](./NOTICE)。
 
 你可以在许可证允许的范围内使用、研究、修改和分发本项目源码。分发修改版本时，请遵守 GPL v3.0 的开源义务，并保留原有许可证和版权说明。
