@@ -134,7 +134,8 @@ See [CHANGELOG.en.md](CHANGELOG.en.md) for the version history and [docs/RELEASE
 - Current official Android version: `26.3.5` (`versionCode 61`)
 - Minimum Android version: Android 8.0 (API 26)
 - Target Android API level: API 35
-- License: GNU GPL v3.0 only, with compatible additional terms under Section 7
+- Original project code: GNU GPL v3.0 only, with compatible additional terms under Section 7
+- Bundled third-party code and voice assets remain under their respective licenses. See [NOTICE](./NOTICE) and the [WeChat Mini Program notices](./wechat-miniprogram/NOTICE).
 - Author: 牛杂の经济学
 
 Version numbers are based on the year. Releases made in 2026 use the `26.x.x` series. Feature updates increment the minor version, bug-fix updates increment the patch version, and Android `versionCode` values increase independently.
