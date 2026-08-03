@@ -45,3 +45,22 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
+  miniprogram-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    defaults:
+      run:
+        working-directory: wechat-miniprogram
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run WeChat Mini Program tests
+        run: npm test
