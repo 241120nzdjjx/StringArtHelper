@@ -146,6 +146,8 @@ If you have a suggestion, encounter a problem, or find any part of the Mini Prog
 
 ## Open-Source License
 
-This project is released under the [GNU General Public License v3.0](../LICENSE).
+Original code developed for this project is released under the [GNU General Public License v3.0](../LICENSE), with compatible additional terms under Section 7.
+
+Bundled third-party code and voice assets remain under their respective licenses and are not relicensed under the GPL. See [NOTICE](./NOTICE) for complete source, attribution, and license information.
 
 You may use, study, modify, and distribute the source code under the terms of the license. When distributing a modified version, you must comply with the open-source obligations of GPL v3.0 and preserve the original license and copyright notices.
