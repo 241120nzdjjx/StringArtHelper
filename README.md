@@ -117,7 +117,8 @@ npm test
 - 当前正式版本：`26.3.5`（versionCode 61）
 - 最低 Android：8.0（API 26）
 - 目标 Android：API 35
-- 许可证：GNU GPL v3.0 only，另有兼容的第 7 条附加条款
+- 本项目原创代码采用 GNU GPL v3.0 only，并附带兼容的第 7 条附加条款
+内置第三方代码及语音素材采用各自的许可证，详见 [NOTICE](./NOTICE) 和 [小程序第三方声明](./wechat-miniprogram/NOTICE)
 - 作者：牛杂の经济学
 
 版本号按年份命名：2026 年为 `26.x.x`；功能更新递增次版本，修复更新递增补丁版本，Android `versionCode` 独立递增。
