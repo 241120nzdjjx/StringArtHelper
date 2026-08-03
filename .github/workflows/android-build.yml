@@ -45,6 +45,7 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
+          
   miniprogram-test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
