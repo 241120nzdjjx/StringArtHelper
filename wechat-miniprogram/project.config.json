@@ -59,10 +59,6 @@
       {
         "value": "NOTICE",
         "type": "file"
-      },
-      {
-        "value": "StringArtHelper-WeChat-v1.1.2-source.zip",
-        "type": "file"
       }
     ],
     "include": []
