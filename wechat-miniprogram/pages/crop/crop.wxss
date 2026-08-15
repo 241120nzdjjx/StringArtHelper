@@ -1,0 +1,33 @@
+.crop-page {
+  min-height: 100vh;
+  overflow: hidden;
+  background: #101016;
+}
+
+.crop-note {
+  min-height: 82rpx;
+  padding: 14rpx 26rpx;
+  color: #c9c9d4;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.canvas-shell {
+  margin: 0 auto;
+  overflow: hidden;
+  background: #000;
+}
+
+.crop-canvas {
+  display: block;
+  filter: grayscale(100%);
+}
+
+.crop-controls {
+  padding: 18rpx 28rpx calc(22rpx + env(safe-area-inset-bottom));
+}
+
+.crop-controls button {
+  height: 78rpx;
+  line-height: 78rpx;
+}

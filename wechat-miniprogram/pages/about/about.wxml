@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="panel about-hero">
+    <view class="title">{{text.appName}}</view>
+    <view class="version">{{text.wechatEdition}} · v1.2.2</view>
+    <view class="about-copy">{{text.aboutIntro}}</view>
+  </view>
+
+  <view class="panel">
+    <view class="section-title">{{text.suggestions}}</view>
+    <view class="subtitle about-note">{{text.suggestionNote}}</view>
+    <button class="secondary contact" data-value="241120nzdjjx@gmail.com" bindtap="copyValue">
+      Email · 241120nzdjjx@gmail.com
+    </button>
+  </view>
+
+  <view class="panel">
+    <view class="section-title">Bilibili</view>
+    <view class="subtitle about-note">{{text.bilibiliNote}}</view>
+    <button class="secondary contact" data-value="https://b23.tv/K3Cp0ZZ" bindtap="copyValue">
+      {{text.copyBilibili}}
+    </button>
+  </view>
+
+  <view class="panel">
+    <view class="section-title">GitHub · Android</view>
+    <view class="subtitle about-note">{{text.androidRepoNote}}</view>
+    <button class="secondary contact" data-value="https://github.com/241120nzdjjx/StringArtHelper" bindtap="copyValue">
+      {{text.copyAndroidRepo}}
+    </button>
+  </view>
+
+  <button class="primary" open-type="share">{{text.shareApp}}</button>
+</view>

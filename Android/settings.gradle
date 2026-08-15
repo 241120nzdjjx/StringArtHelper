@@ -1,0 +1,28 @@
+pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == 'com.android.application') {
+                useModule('com.android.tools.build:gradle:8.7.3')
+            }
+        }
+    }
+    repositories {
+        def mirrorOverride = System.getenv('STRING_ART_LOCAL_MAVEN')
+        def localPluginMirror = mirrorOverride ? file(mirrorOverride) : file("../../toolchain/local-maven")
+        if (localPluginMirror.isDirectory()) {
+            maven { url = uri(localPluginMirror) }
+        }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'StringArtHelper'
+include ':app'

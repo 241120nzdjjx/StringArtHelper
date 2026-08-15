@@ -1,0 +1,48 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+
+# Signing material and secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+*.properties.local
+
+# Build products and local release packages
+*.apk
+*.aab
+*.apks
+*.zip
+deliverables/
+output/
+/manual-build-src/
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+
+# WeChat Mini Program private configuration
+wechat-miniprogram/project.private.config.json
+wechat-miniprogram/.idea/
+wechat-miniprogram/node_modules/
+wechat-miniprogram/miniprogram_npm/
+
+# Local test and generated files
+wechat-miniprogram/*.log
+wechat-miniprogram/*.zip
+wechat-miniprogram/output/
+wechat-miniprogram/temp/
+
+# Xiaomi Smart Band / Wearable
+Wearable/node_modules/
+Wearable/dist/
+Wearable/sign/
+.temp_Wearable/
+*.rpk

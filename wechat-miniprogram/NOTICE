@@ -1,0 +1,43 @@
+绕线助手 / String Art Helper
+Copyright (C) 2026 牛杂の经济学
+
+Licensed under the GNU General Public License, version 3 only.
+SPDX-License-Identifier: GPL-3.0-only
+
+Modified distributions must comply with GPL-3.0-only and the compatible
+additional terms in ADDITIONAL_TERMS.md. They must be clearly identified as
+modified and must not claim to be an official build.
+
+The string-generation core is informed by and adapted from the publicly
+available client-side algorithm used by StringAr.com:
+https://stringar.com/stringart-worker.js
+https://github.com/zhonglinxin/StringAr
+
+MIT License
+
+Copyright (c) 2025 zhonglinxin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+Bundled Mandarin number voice clips are adapted from hugolpz/audio-cmn,
+recorded by Yue Tan and distributed under CC BY-SA:
+https://github.com/hugolpz/audio-cmn
+
+Bundled English digit voice clips are adapted from the Free Spoken Digit
+Dataset, speaker Jackson, distributed under CC BY-SA 4.0:
+https://github.com/Jakobovski/free-spoken-digit-dataset

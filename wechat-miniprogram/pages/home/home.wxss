@@ -1,0 +1,33 @@
+.hero {
+  padding-top: 38rpx;
+  padding-bottom: 38rpx;
+  background: linear-gradient(145deg, #252038, #1d1d27 64%);
+}
+
+.version {
+  display: inline-block;
+  margin-top: 24rpx;
+  padding: 8rpx 16rpx;
+  color: #cbb7ff;
+  background: #30264a;
+  border-radius: 999rpx;
+  font-size: 23rpx;
+}
+
+.current-card {
+  min-height: 210rpx;
+}
+
+.current-name {
+  font-size: 31rpx;
+  font-weight: 650;
+  margin-bottom: 8rpx;
+}
+.offscreen-thumb {
+  position: fixed;
+  left: -1000px;
+  top: -1000px;
+  width: 192px;
+  height: 192px;
+  pointer-events: none;
+}

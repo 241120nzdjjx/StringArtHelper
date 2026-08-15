@@ -1,0 +1,34 @@
+<view class="page">
+  <canvas type="2d" id="importThumbCanvas" class="offscreen-thumb" />
+  <view class="hero panel">
+    <view class="title">{{text.appName}}</view>
+    <view class="subtitle">{{text.tagline}}</view>
+    <view class="version">{{text.versionLabel}}</view>
+  </view>
+
+  <view class="panel">
+    <button class="primary" bindtap="chooseImage">{{text.chooseImage}}</button>
+    <button class="secondary" bindtap="importTxt">{{text.importTxt}}</button>
+    <view class="file-import-hint">{{text.fileImportHint}}</view>
+    <button class="secondary" bindtap="openProjects">{{text.projectsTitle}}</button>
+  </view>
+
+  <view class="panel current-card">
+    <view class="section-title">{{text.currentProgress}}</view>
+    <block wx:if="{{current}}">
+      <view class="current-name">{{current.name}}</view>
+      <view class="subtitle">
+        {{current.index + 1}} / {{current.sequenceCount}} {{text.steps}}
+      </view>
+      <button class="primary" bindtap="continueCurrent">{{text.continueProject}}</button>
+    </block>
+    <view wx:else class="muted">{{text.noProject}}</view>
+  </view>
+
+  <view class="button-grid">
+    <button class="secondary" bindtap="openAbout">{{text.about}}</button>
+    <button class="ghost" open-type="share">{{text.shareApp}}</button>
+    <button class="ghost" bindtap="toggleLanguage">{{text.language}}</button>
+    <button class="ghost" bindtap="openReader" disabled="{{!current}}">{{text.openReader}}</button>
+  </view>
+</view>

@@ -1,0 +1,47 @@
+<view class="page">
+  <view class="panel preview-row">
+    <image class="crop-preview" src="{{cropImagePath}}" mode="aspectFit" />
+    <view class="grow">
+      <view class="section-title">{{text.generatorTitle}}</view>
+      <view class="subtitle">0 → {{nails - 1}} · {{text.nails}}</view>
+      <view class="subtitle">{{text.cropExplain}}</view>
+    </view>
+  </view>
+
+  <view class="panel">
+    <label class="label">{{text.nails}} · {{nails}}</label>
+    <slider min="100" max="500" step="10" value="{{nails}}" show-value
+      activeColor="#9769ff" bindchange="onNails" bindchanging="onNails" />
+
+    <label class="label">{{text.lines}} · {{lines}}</label>
+    <slider min="1000" max="20000" step="500" value="{{lines}}" show-value
+      activeColor="#9769ff" bindchange="onLines" bindchanging="onLines" />
+
+    <label class="label">{{text.circle}}</label>
+    <input class="input" type="number" value="{{circleMm}}" data-field="circleMm"
+      bindinput="onInput" bindblur="onSizeBlur" />
+
+    <label class="label">{{text.thread}}</label>
+    <input class="input" type="digit" value="{{lineMm}}" data-field="lineMm"
+      bindinput="onLineInput" bindblur="onLineBlur" />
+    <slider min="1" max="100" step="1" value="{{lineSlider}}" show-value
+      activeColor="#9769ff" bindchange="onLineSlider" bindchanging="onLineSlider" />
+
+    <view class="row switch-row">
+      <text class="grow">{{text.autoStop}}</text>
+      <switch checked="{{autoStop}}" color="#9769ff" bindchange="onAutoStop" />
+    </view>
+    <view class="subtitle">80–1200 mm · 0.01–1.00 mm</view>
+  </view>
+
+  <view wx:if="{{generating}}" class="panel center">
+    <view class="section-title">{{text.generating}}</view>
+    <progress percent="{{progress}}" activeColor="#9769ff" stroke-width="8" />
+    <view class="subtitle progress-text">{{complete}} / {{lines}}</view>
+    <button class="danger" bindtap="cancelGeneration">{{text.cancel}}</button>
+  </view>
+
+  <button wx:else class="primary" bindtap="startGeneration">{{text.start}}</button>
+
+  <canvas type="2d" id="targetCanvas" class="target-canvas" />
+</view>

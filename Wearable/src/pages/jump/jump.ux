@@ -1,0 +1,279 @@
+<template>
+  <div class="page">
+    <div class="header"><input class="back" type="button" value="‹ 返回" onclick="back"/><text class="title">跳转进度</text></div>
+    <text class="project">{{project}}</text>
+    <div class="target-card">
+      <text class="hint">输入目标步骤</text>
+      <text class="target">{{inputText}}</text>
+      <text class="sub">{{ready ? '当前第 ' + current + ' / ' + total + ' 步　' + nailText : '正在读取手机或手环存档状态'}}</text>
+    </div>
+    <div class="key-row">
+      <input class="key" type="button" value="1" onclick="digit('1')"/>
+      <input class="key" type="button" value="2" onclick="digit('2')"/>
+      <input class="key" type="button" value="3" onclick="digit('3')"/>
+    </div>
+    <div class="key-row">
+      <input class="key" type="button" value="4" onclick="digit('4')"/>
+      <input class="key" type="button" value="5" onclick="digit('5')"/>
+      <input class="key" type="button" value="6" onclick="digit('6')"/>
+    </div>
+    <div class="key-row">
+      <input class="key" type="button" value="7" onclick="digit('7')"/>
+      <input class="key" type="button" value="8" onclick="digit('8')"/>
+      <input class="key" type="button" value="9" onclick="digit('9')"/>
+    </div>
+    <div class="key-row">
+      <input class="key utility" type="button" value="清除" onclick="clearInput"/>
+      <input class="key" type="button" value="0" onclick="digit('0')"/>
+      <input class="key utility" type="button" value="退格" onclick="backspace"/>
+    </div>
+    <div class="quick-row">
+      <input class="quick" type="button" value="开头" onclick="toStart"/>
+      <input class="quick" type="button" value="当前" onclick="toCurrent"/>
+      <input class="quick" type="button" value="结尾" onclick="toEnd"/>
+    </div>
+    <input class="confirm" type="button" value="跳转并播报" onclick="confirm"/>
+    <text class="status">{{status}}</text>
+    <div class="undo-toast" if="{{showUndo}}">
+      <text class="undo-title">已跳转到第 {{target}} 步</text>
+      <text class="undo-count">{{undoSeconds}} 秒后自动确认</text>
+      <div class="undo-actions"><input class="undo-btn" type="button" value="撤销" onclick="undoJump"/><input class="undo-btn confirm-now" type="button" value="确认" onclick="confirmJump"/></div>
+    </div>
+  </div>
+</template>
+
+<script>
+import storage from '@system.storage'
+import file from '@system.file'
+import interconnect from '@system.interconnect'
+import vibrator from '@system.vibrator'
+import router from '@system.router'
+
+const DIR = 'internal://files/stringart/'
+export default {
+  protected: {
+    initialReady: false, initialOnline: false, initialConnected: false,
+    initialArchiveId: '', initialProject: '', initialCurrent: 0, initialTotal: 0,
+    initialCurrentNail: '', initialBits: 0, initialCrc32: 0, initialBaseIndex: 0
+  },
+  private: {
+    conn: null, connected: false, phoneMode: false, ready: false, archiveId: '', project: '当前项目', current: 1, target: 1, inputText: '1', replaceOnNextDigit: true,
+    total: 0, sliderMax: 1, bits: 0, crc32: 0, baseIndex: 0, targetNail: null,
+    nailText: '', status: '正在读取当前进度', requestId: 0, waitingJump: false,
+    pendingOld: 1, showUndo: false, undoSeconds: 5, undoTimer: null, vibrateEnabled: true
+  },
+  onInit() { this.applyInitialState(); this.loadVibration(); this.connect(); this.load() },
+  onShow() { this.loadVibration(); this.connect(); if (!this.ready) this.load() },
+  onDestroy() { this.stopUndoTimer() },
+  applyInitialState() {
+    const total = Number(this.initialTotal) || 0
+    if (!this.initialReady || total < 1) return
+    this.connected = !!this.initialConnected
+    this.phoneMode = !!this.initialOnline
+    this.archiveId = this.phoneMode ? '' : (this.initialArchiveId || '')
+    this.project = this.initialProject || (this.archiveId ? '离线存档' : '手机当前项目')
+    this.total = total; this.sliderMax = Math.max(1, total)
+    this.current = Math.max(1, Math.min(Number(this.initialCurrent) || 1, this.sliderMax))
+    this.target = this.current; this.inputText = String(this.current); this.replaceOnNextDigit = true
+    this.bits = Number(this.initialBits) || 0; this.crc32 = Number(this.initialCrc32) || 0
+    this.baseIndex = Number(this.initialBaseIndex) || 0
+    const nail = this.initialCurrentNail
+    this.nailText = nail === '' || nail === null || nail === undefined || nail === '—' ? '' : '当前钉号 ' + nail
+    this.ready = true; this.status = '输入数字后确认跳转'
+  },
+  loadVibration() { storage.get({ key: 'shared_config', default: '{}', success: value => {
+    try { this.vibrateEnabled = JSON.parse(value || '{}').watchVibration !== false } catch (e) { this.vibrateEnabled = true }
+  }}) },
+  connect() {
+    if (!this.conn) this.conn = interconnect.instance()
+    this.conn.onmessage = event => {
+      const data = this.parseMessage(event)
+      if (data && data.type === 'state') {
+        this.connected = true
+        storage.set({ key: 'last_phone_state', value: JSON.stringify(data) })
+        if (data.loaded && Number(data.total) > 0) {
+          this.phoneMode = true; this.archiveId = ''; this.applyPhoneState(data)
+        } else if (!this.ready) this.applyPhoneState(data)
+      }
+      if (data && data.type === 'jump_result' && Number(data.requestId) === this.requestId) {
+        this.waitingJump = false
+        if (!data.success) { this.status = '手机拒绝了跳转，请确认已载入序列'; return }
+        this.target = Math.max(1, Number(data.index) || this.target)
+        this.current = this.target; this.feedback(); this.startUndo()
+      }
+    }
+    this.conn.onopen = () => { this.connected = true; this.conn.send({ data: { type: 'request_state' } }); this.loadPhoneState() }
+    this.conn.onclose = () => { this.connected = false }
+    this.conn.getReadyState({ success: state => {
+      if (state.status === 1) { this.connected = true; this.conn.send({ data: { type: 'request_state' } }); this.loadPhoneState() }
+    } })
+  },
+  load() {
+    storage.get({ key: 'active_archive_id', default: '', success: id => {
+      if (this.connected && !this.archiveId) { this.loadPhoneState(); return }
+      this.archiveId = id || ''
+      if (this.archiveId) {
+        storage.get({ key: 'archive_list', default: '[]', success: value => {
+          let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+          for (let i = 0; i < list.length; i++) if (list[i].archiveId === this.archiveId) {
+            const meta = list[i]
+            this.phoneMode = false; this.project = meta.name || meta.source || '离线存档'
+            this.total = Number(meta.total) || 0; this.sliderMax = Math.max(1, this.total)
+            this.current = Math.max(1, Math.min((Number(meta.index) || 0) + 1, this.sliderMax))
+            this.target = this.current; this.inputText = String(this.current); this.replaceOnNextDigit = true; this.bits = Number(meta.bits) || 0
+            this.crc32 = Number(meta.crc32) || 0
+            this.baseIndex = meta.syncedIndex === undefined ? Number(meta.index) || 0 : Number(meta.syncedIndex)
+            this.ready = this.total > 0; this.status = this.ready ? '输入数字后确认跳转' : '这个存档没有钉号序列'; this.updateNail(); return
+          }
+        }})
+      } else this.loadPhoneState()
+    }})
+  },
+  loadPhoneState() { storage.get({ key: 'last_phone_state', default: '', success: value => {
+    try {
+      const state = JSON.parse(value || '{}')
+      if (state && state.loaded && Number(state.total) > 0) {
+        this.phoneMode = true; this.archiveId = ''; this.applyPhoneState(state)
+      } else if (!this.ready && state && state.type === 'state') this.applyPhoneState(state)
+    } catch (e) {}
+  }}) },
+  applyPhoneState(state) {
+    this.project = state.project || '手机当前项目'; this.total = Number(state.total) || 0
+    this.sliderMax = Math.max(1, this.total)
+    this.ready = !!state.loaded && this.total > 0
+    if (!this.ready) { this.current = 1; this.target = 1; this.inputText = ''; this.nailText = ''; this.status = '请先在手机端载入序列'; return }
+    this.current = Math.max(1, Math.min(Number(state.index) || 1, this.sliderMax))
+    if (!this.waitingJump && !this.showUndo) { this.target = this.current; this.inputText = String(this.current); this.replaceOnNextDigit = true }
+    this.nailText = state.current === null || state.current === undefined ? '' : '当前钉号 ' + state.current
+    this.status = '输入数字后确认跳转'
+  },
+  clamp(value) { return Math.max(1, Math.min(Number(value) || 1, this.sliderMax)) },
+  setTarget(value) {
+    this.target = this.clamp(value); this.inputText = String(this.target); this.replaceOnNextDigit = true
+    this.status = '输入数字后确认跳转'; this.updateNail()
+  },
+  digit(value) {
+    let text = this.replaceOnNextDigit || this.inputText === '0' ? '' : this.inputText
+    this.replaceOnNextDigit = false
+    if (text.length >= 6) { this.status = '最多输入 6 位'; return }
+    text += value
+    const number = Number(text) || 0
+    this.inputText = text
+    if (number < 1 || number > this.sliderMax) {
+      this.nailText = ''; this.status = number > this.sliderMax ? '不能超过总步数' : '步骤从 1 开始'
+      return
+    }
+    this.target = number; this.status = '输入数字后确认跳转'; this.updateNail()
+  },
+  clearInput() { this.inputText = ''; this.replaceOnNextDigit = false; this.nailText = ''; this.status = '请输入 1～' + this.sliderMax },
+  backspace() {
+    this.replaceOnNextDigit = false
+    this.inputText = this.inputText.length > 0 ? this.inputText.substring(0, this.inputText.length - 1) : ''
+    const number = Number(this.inputText) || 0
+    if (number >= 1 && number <= this.sliderMax) { this.target = number; this.status = '输入数字后确认跳转'; this.updateNail() }
+    else { this.nailText = ''; this.status = '请输入 1～' + this.sliderMax }
+  },
+  toStart() { this.setTarget(1) },
+  toCurrent() { this.setTarget(this.current) },
+  toEnd() { this.setTarget(this.sliderMax) },
+  updateNail() {
+    if (!this.archiveId || this.bits < 1) { this.targetNail = null; this.nailText = this.target === this.current ? '当前步骤' : ''; return }
+    const step = this.target - 1
+    const bitStart = step * this.bits; const byteStart = Math.floor(bitStart / 8)
+    const shift = bitStart - byteStart * 8; const length = Math.ceil((shift + this.bits) / 8)
+    file.readArrayBuffer({ uri: DIR + this.archiveId + '.bin', position: byteStart, length: length,
+      success: data => {
+        const raw = data && data.buffer !== undefined ? data.buffer : data
+        const bytes = raw && raw.length !== undefined ? raw : new Uint8Array(raw || 0)
+        let value = 0
+        for (let bit = 0; bit < this.bits; bit++) {
+          const p = shift + bit; const byte = Number(bytes[p >> 3]) || 0
+          if (((byte >>> (p & 7)) & 1) !== 0) value += Math.pow(2, bit)
+        }
+        this.targetNail = value; this.nailText = '钉号 ' + value
+      }, fail: () => { this.targetNail = null; this.nailText = '' } })
+  },
+  confirm() {
+    if (!this.ready || this.total < 1) { this.status = '当前没有可跳转的序列'; this.connect(); return }
+    if (this.waitingJump || this.showUndo) return
+    const entered = Number(this.inputText) || 0
+    if (entered < 1 || entered > this.sliderMax) { this.status = '请输入 1～' + this.sliderMax; return }
+    this.target = entered; this.pendingOld = this.current
+    if (this.archiveId && !this.phoneMode) {
+      this.writeOfflineIndex(this.target, () => { this.current = this.target; this.feedback(); this.startUndo() })
+      return
+    }
+    if (!this.connected) { this.status = '手机已断开，正在重新连接'; this.connect(); return }
+    this.requestId++; this.waitingJump = true; this.status = '正在等待手机确认跳转…'
+    if (this.conn) this.conn.send({ data: { type: 'command', action: 'jump', index: this.target - 1, requestId: this.requestId },
+      fail: () => { this.waitingJump = false; this.status = '跳转指令发送失败，请重试' } })
+  },
+  writeOfflineIndex(step, done) {
+    storage.get({ key: 'archive_list', default: '[]', success: value => {
+      let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+      for (let i = 0; i < list.length; i++) if (list[i].archiveId === this.archiveId) {
+        list[i].index = step - 1
+        if (step === this.target && this.targetNail !== null) list[i].current = this.targetNail
+      }
+      storage.set({ key: 'archive_list', value: JSON.stringify(list), success: () => {
+        if (this.conn) this.conn.send({ data: { type: 'archive_progress', archiveId: this.archiveId,
+          index: step - 1, baseIndex: this.baseIndex, crc32: this.crc32 } })
+        if (done) done()
+      }})
+    }})
+  },
+  startUndo() {
+    this.stopUndoTimer(); this.showUndo = true; this.undoSeconds = 5; this.status = '可撤销本次跳转'
+    this.undoTimer = setTimeout(() => this.undoTick(), 1000)
+  },
+  undoTick() {
+    if (!this.showUndo) return
+    this.undoSeconds--
+    if (this.undoSeconds <= 0) { this.confirmJump(); return }
+    this.undoTimer = setTimeout(() => this.undoTick(), 1000)
+  },
+  stopUndoTimer() { if (this.undoTimer !== null) clearTimeout(this.undoTimer); this.undoTimer = null },
+  undoJump() {
+    this.stopUndoTimer(); this.showUndo = false
+    if (this.archiveId && !this.phoneMode) {
+      this.writeOfflineIndex(this.pendingOld, () => { this.feedback(); router.back() }); return
+    }
+    this.requestId++
+    if (this.conn) this.conn.send({ data: { type: 'command', action: 'jump', index: this.pendingOld - 1, requestId: this.requestId } })
+    this.feedback(); router.back()
+  },
+  confirmJump() { this.stopUndoTimer(); this.showUndo = false; router.back() },
+  feedback() { if (this.vibrateEnabled) vibrator.vibrate({ mode: 'long' })
+  },
+  parseMessage(event) {
+    let data = event && event.data !== undefined ? event.data : event
+    if (data && data.data !== undefined && data.type === undefined) data = data.data
+    if (typeof data !== 'string' && data && (data.length !== undefined || data.byteLength !== undefined || data.buffer !== undefined)) {
+      const raw = data.buffer !== undefined ? data.buffer : data
+      const bytes = raw && raw.length !== undefined ? raw : new Uint8Array(raw || 0)
+      data = this.decodeUtf8(bytes)
+    }
+    try { return typeof data === 'string' ? JSON.parse(data) : data } catch (e) { return null }
+  },
+  decodeUtf8(bytes) {
+    let output = ''
+    for (let i = 0; i < bytes.length; i++) {
+      let c = Number(bytes[i]) & 255
+      if (c < 128) output += String.fromCharCode(c)
+      else if (c < 224 && i + 1 < bytes.length) output += String.fromCharCode(((c & 31) << 6) | (Number(bytes[++i]) & 63))
+      else if (c < 240 && i + 2 < bytes.length) output += String.fromCharCode(((c & 15) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63))
+      else if (i + 3 < bytes.length) { let code = ((c & 7) << 18) | ((Number(bytes[++i]) & 63) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63); code -= 65536; output += String.fromCharCode(55296 + (code >> 10), 56320 + (code & 1023)) }
+    }
+    return output
+  },
+  back() { router.back() }
+}
+</script>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #101016; flex-direction: column; padding: 12px 14px 8px 14px; align-items: center; }
+.header { width: 308px; height: 48px; flex-direction: row; align-items: center; }.back { width: 86px; height: 40px; border-radius: 14px; color: #ffffff; font-size: 15px; background-color: #262632; }.title { width: 210px; color: #f5f5fa; font-size: 21px; font-weight: bold; text-align: center; }
+.project { width: 308px; height: 20px; color: #9d9dae; font-size: 13px; text-align: center; lines: 1; text-overflow: ellipsis; }.target-card { width: 270px; height: 66px; border-radius: 20px; background-color: #1d1d27; flex-direction: column; justify-content: center; align-items: center; }.hint { height: 18px; color: #9d9dae; font-size: 13px; }.target { width: 240px; height: 31px; color: #ffffff; font-size: 28px; font-weight: bold; text-align: center; }.sub { height: 17px; color: #77778b; font-size: 12px; }
+.key-row { width: 288px; height: 51px; flex-direction: row; justify-content: space-between; }.key { width: 90px; height: 47px; border-radius: 15px; color: #ffffff; font-size: 22px; background-color: #30303e; }.utility { font-size: 14px; background-color: #262632; }.quick-row { width: 288px; height: 40px; flex-direction: row; justify-content: space-between; }.quick { width: 92px; height: 37px; border-radius: 13px; color: #ffffff; font-size: 14px; background-color: #262632; }.confirm { width: 288px; height: 49px; border-radius: 17px; color: #ffffff; font-size: 18px; font-weight: bold; background-color: #9769ff; }.status { width: 308px; height: 20px; color: #77778b; font-size: 11px; text-align: center; padding-top: 3px; }
+.undo-toast { position: absolute; left: 14px; bottom: 10px; width: 308px; height: 118px; border-radius: 22px; background-color: #292936; flex-direction: column; align-items: center; padding: 8px; }.undo-title { width: 286px; height: 26px; color: #ffffff; font-size: 17px; font-weight: bold; text-align: center; }.undo-count { width: 286px; height: 22px; color: #b5b5c7; font-size: 13px; text-align: center; }.undo-actions { width: 286px; height: 51px; flex-direction: row; justify-content: space-between; }.undo-btn { width: 138px; height: 47px; border-radius: 15px; background-color: #3a3a49; color: #ffffff; font-size: 16px; }.confirm-now { background-color: #9769ff; }
+</style>

@@ -1,0 +1,8 @@
+{
+  "name": "string-art-helper-wechat",
+  "version": "1.2.2",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run-all.js"
+  }
+}

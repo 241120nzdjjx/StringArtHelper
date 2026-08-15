@@ -1,0 +1,84 @@
+<template>
+  <div class="page">
+    <div class="header"><input class="back" type="button" value="‹ 返回" onclick="back"/><text class="title">手环存档</text></div>
+    <text class="hint">{{status}}</text>
+    <list class="list">
+      <list-item class="card" type="archive" for="archive in archives" tid="archiveId">
+        <image class="thumb" src="{{archive.thumbUri}}" alt="/common/logo.png" onerror="thumbError(archive.archiveId)"></image>
+        <div class="meta" onclick="activate(archive.archiveId)">
+          <text class="name">{{archive.activeMark}}{{archive.name}}</text>
+          <text class="progress">{{archive.progressText}}</text>
+        </div>
+        <input class="delete" type="button" value="删" onclick="remove(archive.archiveId)"/>
+      </list-item>
+      <list-item type="empty" if="{{showEmpty}}"><text class="empty">手机端点击“同步全部存档”后会显示在这里</text></list-item>
+    </list>
+  </div>
+</template>
+
+<script>
+import storage from '@system.storage'
+import file from '@system.file'
+import interconnect from '@system.interconnect'
+import router from '@system.router'
+
+const DIR = 'internal://files/stringart/'
+export default {
+  private: { archives: [], records: [], activeId: '', conn: null, showEmpty: true, status: '正在读取手环存档…' },
+  onInit() { this.connect(); this.load() }, onShow() { this.connect(); this.load() },
+  connect() { if (!this.conn) this.conn = interconnect.instance() },
+  load() { storage.get({ key: 'active_archive_id', default: '', success: active => {
+    this.activeId = active
+    storage.get({ key: 'archive_list', default: '[]', success: value => {
+      let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+      this.records = list
+      const rows = []
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i]; const index = (Number(item.index) || 0) + 1; const total = Number(item.total) || 0
+        rows.push({ archiveId: item.archiveId, name: item.name || item.source || '未命名存档',
+          index: Number(item.index) || 0, total: total, active: item.archiveId === active,
+          activeMark: item.archiveId === active ? '● ' : '', progressText: '第 ' + index + ' / ' + total + ' 步',
+          thumbUri: (Number(item.thumbnailBytes) || 0) > 0 ? DIR + item.archiveId + '.jpg' : DIR + item.archiveId + '.preview.jpg',
+          fallbackUsed: (Number(item.thumbnailBytes) || 0) < 1 })
+      }
+      this.archives = rows; this.showEmpty = rows.length === 0
+      this.status = rows.length ? '点击卡片切换 · 右侧按钮删除' : '当前没有离线存档'
+    }, fail: () => { this.archives = []; this.showEmpty = true; this.status = '读取存档列表失败' } })
+  }, fail: () => { this.archives = []; this.showEmpty = true; this.status = '读取活动存档失败' } }) },
+  activate(id) { if (!id) return
+    storage.set({ key: 'active_archive_id', value: id, success: () => {
+      for (let i = 0; i < this.archives.length; i++) if (this.archives[i].archiveId === id && this.conn)
+        this.conn.send({ data: { type: 'archive_activate', archiveId: id } })
+      this.status = '已切换存档，正在同步手机'
+      this.load()
+    }})
+  },
+  remove(id) { if (!id) return
+    let list = []; for (let i = 0; i < this.records.length; i++) if (this.records[i].archiveId !== id) list.push(this.records[i])
+    file.delete({ uri: DIR + id + '.bin' }); file.delete({ uri: DIR + id + '.jpg' }); file.delete({ uri: DIR + id + '.preview.jpg' })
+    storage.set({ key: 'archive_list', value: JSON.stringify(list), success: () => {
+      const nextId = this.activeId === id ? (list.length ? list[0].archiveId : '') : this.activeId
+      storage.set({ key: 'active_archive_id', value: nextId, complete: () => { this.status = '存档已删除'; this.load() } })
+    }})
+  },
+  thumbError(id) {
+    const rows = []
+    for (let i = 0; i < this.archives.length; i++) {
+      const item = this.archives[i]
+      if (item.archiveId === id && !item.fallbackUsed) {
+        item.thumbUri = DIR + id + '.preview.jpg'; item.fallbackUsed = true
+      }
+      rows.push(item)
+    }
+    this.archives = rows
+  },
+  back() { router.back() }
+}
+</script>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #101016; flex-direction: column; padding: 12px 14px 8px 14px; }.header { width: 308px; height: 48px; flex-direction: row; align-items: center; }
+.back { width: 86px; height: 40px; border-radius: 14px; color: #ffffff; font-size: 15px; background-color: #262632; }.title { width: 210px; color: #f5f5fa; font-size: 21px; font-weight: bold; text-align: center; }
+.hint { width: 308px; height: 28px; color: #77778b; font-size: 12px; text-align: center; }.list { width: 308px; height: 384px; }.card { width: 304px; height: 82px; margin-bottom: 8px; padding: 8px; border-radius: 18px; background-color: #1d1d27; flex-direction: row; align-items: center; }
+.thumb { width: 62px; height: 62px; border-radius: 12px; background-color: #ffffff; object-fit: cover; }.meta { width: 184px; height: 62px; padding-left: 10px; flex-direction: column; justify-content: center; }.name { width: 174px; height: 28px; color: #ffffff; font-size: 16px; lines: 1; text-overflow: ellipsis; }.progress { color: #9d9dae; font-size: 13px; }.delete { width: 42px; height: 42px; border-radius: 14px; color: #ffffff; font-size: 14px; background-color: #5a2635; }.empty { width: 300px; height: 150px; color: #77778b; font-size: 14px; text-align: center; padding-top: 55px; }
+</style>

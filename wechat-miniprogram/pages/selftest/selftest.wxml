@@ -1,0 +1,16 @@
+<view class="page selftest">
+  <view class="panel">
+    <view class="title">StringArtHelper 运行时自检</view>
+    <view class="muted">仅用于开发者工具验证，不会读取或修改用户项目。</view>
+  </view>
+  <view class="panel">
+    <view wx:for="{{checks}}" wx:key="name" class="check-row">
+      <text class="check-name">{{item.name}}</text>
+      <text class="{{item.ok ? 'pass' : 'fail'}}">{{item.status}}</text>
+    </view>
+  </view>
+  <canvas type="2d" id="selftestCanvas" class="test-canvas"></canvas>
+  <view class="panel summary {{done && passed ? 'pass' : (done ? 'fail' : '')}}">
+    {{summary}}
+  </view>
+</view>

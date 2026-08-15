@@ -1,0 +1,62 @@
+{
+  "package": "com.niuza.stringartreader2",
+  "name": "绕线助手",
+  "versionName": "26.5.9",
+  "versionCode": 72,
+  "minPlatformVersion": 1200,
+  "icon": "/common/logo.png",
+  "simulationVersion": "default",
+  "deviceTypeList": [
+    "watch"
+  ],
+  "features": [
+    {
+      "name": "system.storage"
+    },
+    {
+      "name": "system.vibrator"
+    },
+    {
+      "name": "system.interconnect"
+    },
+    {
+      "name": "system.sensor"
+    },
+    {
+      "name": "system.file"
+    },
+    {
+      "name": "system.brightness"
+    },
+    {
+      "name": "system.router"
+    }
+  ],
+  "config": {
+    "logLevel": "log",
+    "designWidth": 336
+  },
+  "router": {
+    "entry": "pages/index",
+    "pages": {
+      "pages/index": {
+        "component": "index"
+      },
+      "pages/archives": {
+        "component": "archives"
+      },
+      "pages/settings": {
+        "component": "settings"
+      },
+      "pages/preview": {
+        "component": "preview"
+      },
+      "pages/jump": {
+        "component": "jump"
+      },
+      "pages/details": {
+        "component": "details"
+      }
+    }
+  }
+}

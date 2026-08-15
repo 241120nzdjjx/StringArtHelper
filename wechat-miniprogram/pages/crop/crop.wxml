@@ -1,0 +1,35 @@
+<view class="crop-page">
+  <view class="crop-note">{{text.cropExplain}}</view>
+  <view class="canvas-shell" style="width:{{canvasSize}}px;height:{{canvasSize}}px;">
+    <canvas
+      type="2d"
+      id="cropCanvas"
+      class="crop-canvas"
+      style="width:{{canvasSize}}px;height:{{canvasSize}}px;"
+      bindtouchstart="onTouchStart"
+      bindtouchmove="onTouchMove"
+      bindtouchend="onTouchEnd"
+      bindtouchcancel="onTouchEnd"
+    />
+  </view>
+  <view class="crop-controls">
+    <view class="row">
+      <text class="muted grow">{{text.zoom}} · {{zoomLabel}}</text>
+    </view>
+    <slider
+      min="{{zoomSliderMin}}"
+      max="400"
+      value="{{zoomSlider}}"
+      step="1"
+      activeColor="#9769ff"
+      backgroundColor="#444457"
+      bindchanging="onZoomSlider"
+      bindchange="onZoomSlider"
+    />
+    <view class="button-grid">
+      <button class="secondary" bindtap="resetCrop">{{text.reset}}</button>
+      <button class="secondary" bindtap="fitWhole">{{text.fitWhole}}</button>
+    </view>
+    <button class="primary" bindtap="confirmCrop" loading="{{exporting}}">{{text.next}}</button>
+  </view>
+</view>

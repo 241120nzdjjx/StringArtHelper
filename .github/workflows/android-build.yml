@@ -1,0 +1,125 @@
+name: Build and test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0' >/dev/null
+        
+      - name: Fetch Xiaomi Wearable SDK 1.4
+        run: |
+          rm -f Android/app/libs/xms-wearable-lib_1.4_release.aar
+          rm -rf /tmp/xiaomi-interconnect
+          mkdir -p /tmp/xiaomi-interconnect Android/app/libs
+
+          curl -fL --retry 3 \
+            'https://cdn.cnbj3-fusion.fds.api.mi-img.com/quickapp-vela/interconnect_dev_test_demo.zip' \
+            -o /tmp/xiaomi-interconnect/demo.zip
+
+          unzip -q /tmp/xiaomi-interconnect/demo.zip \
+            -d /tmp/xiaomi-interconnect/unpacked
+
+          SDK_AAR="$(find /tmp/xiaomi-interconnect/unpacked \
+            -type f \
+            -name 'xms-wearable-lib_1.4_release.aar' \
+            -print -quit)"
+
+          test -n "$SDK_AAR"
+          cp "$SDK_AAR" Android/app/libs/xms-wearable-lib_1.4_release.aar
+
+          ls -lh Android/app/libs/xms-wearable-lib_1.4_release.aar
+          
+      - name: Test Chinese nail-number wording
+        working-directory: Android
+        run: |
+          mkdir -p /tmp/stringart-number-test
+          javac -d /tmp/stringart-number-test \
+            app/src/main/java/com/niuza/stringartreader2/NailNumberFormatter.java \
+            tests/NailNumberFormatterTest.java
+          java -cp /tmp/stringart-number-test com.niuza.stringartreader2.NailNumberFormatterTest
+
+      - name: Build debug and unsigned release APKs
+        working-directory: Android
+        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease
+
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: StringArtHelper-${{ github.sha }}
+          path: Android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
+          
+  miniprogram-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    defaults:
+      run:
+        working-directory: wechat-miniprogram
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run WeChat Mini Program tests
+        run: npm test
+  wearable-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: Wearable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Wearable/package-lock.json
+
+      - name: Install wearable dependencies
+        run: npm ci
+
+      - name: Build Xiaomi Smart Band app
+        run: npm run build
+        

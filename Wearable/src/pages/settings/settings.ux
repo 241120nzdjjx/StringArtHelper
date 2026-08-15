@@ -1,0 +1,156 @@
+<template>
+  <div class="page">
+    <div class="header"><input class="back" type="button" value="‹ 返回" onclick="back"/><text class="title">双端设置</text></div>
+    <text class="sync-state">{{syncText}}</text>
+    <list class="list" bounces="true">
+      <list-item class="section-item" type="section-watch"><text class="section">手环体验</text></list-item>
+      <list-item class="row-item" type="watch-vibration"><input class="row active" type="button" value="震动：{{config.watchVibration ? '开' : '关'}}" onclick="toggleWatchVibration"/></list-item>
+      <list-item class="row-item" type="watch-keep-on"><input class="row active" type="button" value="屏幕常亮：{{config.watchKeepOn ? '开' : '关'}}" onclick="toggleWatchKeepOn"/></list-item>
+      <list-item class="row-item" type="watch-outward"><input class="row" type="button" value="向内翻腕：{{outwardText}}" onclick="cycleWatchOutward"/></list-item>
+      <list-item class="row-item" type="watch-inward"><input class="row" type="button" value="向外翻腕：{{inwardText}}" onclick="cycleWatchInward"/></list-item>
+      <list-item class="section-item" type="section-phone"><text class="section">手机播报</text></list-item>
+      <list-item class="row-item" type="phone-vibration"><input class="row" type="button" value="手机震动：{{config.phoneVibration ? '开' : '关'}}" onclick="togglePhoneVibration"/></list-item>
+      <list-item class="row-item" type="repeat"><input class="row" type="button" value="重复两次：{{config.repeatTwice ? '开' : '关'}}" onclick="toggleRepeat"/></list-item>
+      <list-item class="row-item" type="ducking"><input class="row" type="button" value="媒体压低：{{config.mediaDucking ? '开' : '关'}}" onclick="toggleDucking"/></list-item>
+      <list-item class="adjust-item" type="delay"><div class="adjust"><text class="adjust-label delay-label">等待间隔</text><input class="delay-action" type="button" value="快一点" onclick="delayDown"/><text class="adjust-value delay-number">{{delayText}}</text><input class="delay-action slower-action" type="button" value="慢一点" onclick="delayUp"/></div></list-item>
+      <list-item class="adjust-item" type="rate"><div class="adjust"><text class="adjust-label">播报语速</text><input class="minus" type="button" value="－" onclick="rateDown"/><text class="adjust-value">{{rateText}}</text><input class="plus" type="button" value="＋" onclick="rateUp"/></div></list-item>
+      <list-item class="adjust-item" type="tts-volume"><div class="adjust"><text class="adjust-label">TTS 音量</text><input class="minus" type="button" value="－" onclick="volumeDown"/><text class="adjust-value">{{volumeText}}</text><input class="plus" type="button" value="＋" onclick="volumeUp"/></div></list-item>
+      <list-item class="section-item" type="section-keys"><text class="section">实体音量键</text></list-item>
+      <list-item class="row-item" type="volume-keys"><input class="row" type="button" value="启用：{{config.volumeKeys ? '开' : '关'}}" onclick="toggleVolumeKeys"/></list-item>
+      <list-item class="row-item" type="volume-up"><input class="row selector" type="button" value="音量＋：{{upActionText}}　⌄" onclick="toggleUpChoices"/></list-item>
+      <list-item class="choices-item" type="volume-up-choices" if="{{upExpanded}}"><div class="choices"><input class="choice" type="button" value="上一步" onclick="chooseUp('previous')"/><input class="choice" type="button" value="下一步" onclick="chooseUp('next')"/><input class="choice" type="button" value="播放/暂停" onclick="chooseUp('toggle')"/><input class="choice" type="button" value="重播当前" onclick="chooseUp('replay')"/><input class="choice" type="button" value="快一点" onclick="chooseUp('faster')"/><input class="choice" type="button" value="慢一点" onclick="chooseUp('slower')"/><input class="choice danger" type="button" value="不操作" onclick="chooseUp('none')"/></div></list-item>
+      <list-item class="row-item" type="volume-down"><input class="row selector" type="button" value="音量－：{{downActionText}}　⌄" onclick="toggleDownChoices"/></list-item>
+      <list-item class="choices-item" type="volume-down-choices" if="{{downExpanded}}"><div class="choices"><input class="choice" type="button" value="上一步" onclick="chooseDown('previous')"/><input class="choice" type="button" value="下一步" onclick="chooseDown('next')"/><input class="choice" type="button" value="播放/暂停" onclick="chooseDown('toggle')"/><input class="choice" type="button" value="重播当前" onclick="chooseDown('replay')"/><input class="choice" type="button" value="快一点" onclick="chooseDown('faster')"/><input class="choice" type="button" value="慢一点" onclick="chooseDown('slower')"/><input class="choice danger" type="button" value="不操作" onclick="chooseDown('none')"/></div></list-item>
+      <list-item class="note-item" type="note"><text class="note">任一端修改都会同步到另一端</text></list-item>
+    </list>
+  </div>
+</template>
+
+<script>
+import storage from '@system.storage'
+import interconnect from '@system.interconnect'
+import brightness from '@system.brightness'
+import vibrator from '@system.vibrator'
+import router from '@system.router'
+
+const DEFAULT_CONFIG = { revision: 0, repeatTwice: false, delayMs: 2500, speechRate: 0.82,
+  ttsVolume: 100, mediaDucking: true, phoneVibration: false, volumeKeys: false,
+  volumeUpAction: 'previous', volumeDownAction: 'next', watchVibration: true,
+  watchKeepOn: true, watchOutwardAction: 'next', watchInwardAction: 'previous' }
+
+export default {
+  private: { config: DEFAULT_CONFIG, conn: null, upExpanded: false, downExpanded: false,
+    syncText: '正在读取本地设置…', delayText: '2.5 秒', rateText: '0.82×', volumeText: '100%',
+    outwardText: '下一步', inwardText: '上一步', upActionText: '上一步', downActionText: '下一步' },
+  onInit() { this.load(); this.connect() },
+  onShow() { this.load(); this.connect() },
+  mergeConfig(source) {
+    const result = {}
+    for (const key in DEFAULT_CONFIG) result[key] = DEFAULT_CONFIG[key]
+    if (source) for (const key in source) result[key] = source[key]
+    return result
+  },
+  updateTexts() {
+    this.delayText = (Math.round((Number(this.config.delayMs) || 2500) / 100) / 10) + ' 秒'
+    this.rateText = (Math.round((Number(this.config.speechRate) || 0.82) * 100) / 100) + '×'
+    this.volumeText = (Number(this.config.ttsVolume) || 0) + '%'
+    this.outwardText = this.label(this.config.watchOutwardAction)
+    this.inwardText = this.label(this.config.watchInwardAction)
+    this.upActionText = this.label(this.config.volumeUpAction)
+    this.downActionText = this.label(this.config.volumeDownAction)
+  },
+  load() {
+    this.config = this.mergeConfig(this.config); this.updateTexts()
+    storage.get({ key: 'shared_config', default: JSON.stringify(DEFAULT_CONFIG), success: value => {
+      try { this.config = this.mergeConfig(JSON.parse(value)) } catch (e) { this.config = this.mergeConfig(null) }
+      this.updateTexts(); this.syncText = '已载入设置，正在与手机同步…'
+    }, fail: () => { this.config = this.mergeConfig(null); this.updateTexts(); this.syncText = '显示默认设置' } })
+  },
+  connect() {
+    if (!this.conn) this.conn = interconnect.instance()
+    this.conn.onmessage = event => {
+      const data = this.parseMessage(event)
+      if (data && data.type === 'config_state') {
+        this.config = this.mergeConfig(data.config || {}); this.updateTexts(); this.syncText = '已与手机同步'
+        storage.set({ key: 'shared_config', value: JSON.stringify(this.config) })
+        brightness.setKeepScreenOn({ keepScreenOn: this.config.watchKeepOn !== false })
+      }
+    }
+    this.conn.onopen = () => { this.syncText = '手机已连接，正在同步…'; this.requestConfig() }
+    this.conn.onclose = () => { this.syncText = '手机未连接，修改将在重连后同步' }
+    this.conn.onerror = () => { this.syncText = '连接异常，当前仍可修改本地设置' }
+    this.requestConfig()
+  },
+  requestConfig() {
+    if (!this.conn) return
+    this.conn.getReadyState({ success: state => {
+      if (state.status === 1) { this.syncText = '手机已连接，正在同步…'; this.conn.send({ data: { type: 'request_config' } }) }
+      else this.syncText = '手机未连接，显示手环本地设置'
+    }, fail: () => { this.syncText = '显示手环本地设置' } })
+  },
+  parseMessage(event) {
+    let data = event && event.data !== undefined ? event.data : event
+    if (data && data.data !== undefined && data.type === undefined) data = data.data
+    if (typeof data !== 'string' && data && (data.length !== undefined || data.byteLength !== undefined || data.buffer !== undefined)) {
+      const raw = data.buffer !== undefined ? data.buffer : data
+      const bytes = raw && raw.length !== undefined ? raw : new Uint8Array(raw || 0)
+      data = this.decodeUtf8(bytes)
+    }
+    try { return typeof data === 'string' ? JSON.parse(data) : data }
+    catch (e) { this.syncText = '收到无法识别的手机配置'; return null }
+  },
+  decodeUtf8(bytes) {
+    let output = ''
+    for (let i = 0; i < bytes.length; i++) {
+      let c = Number(bytes[i]) & 255
+      if (c < 128) output += String.fromCharCode(c)
+      else if (c < 224 && i + 1 < bytes.length) output += String.fromCharCode(((c & 31) << 6) | (Number(bytes[++i]) & 63))
+      else if (c < 240 && i + 2 < bytes.length) output += String.fromCharCode(((c & 15) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63))
+      else if (i + 3 < bytes.length) { let code = ((c & 7) << 18) | ((Number(bytes[++i]) & 63) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63); code -= 65536; output += String.fromCharCode(55296 + (code >> 10), 56320 + (code & 1023)) }
+    }
+    return output
+  },
+  toggleWatchVibration() {
+    this.config.watchVibration = !this.config.watchVibration
+    this.save()
+    if (this.config.watchVibration) {
+      vibrator.vibrate({ mode: 'long' })
+      this.syncText = '震动已开启；刚才应有一次测试振动'
+    }
+  },
+  toggleWatchKeepOn() { this.config.watchKeepOn = !this.config.watchKeepOn; this.save() },
+  cycleWatchOutward() { this.config.watchOutwardAction = this.nextAction(this.config.watchOutwardAction); this.save() },
+  cycleWatchInward() { this.config.watchInwardAction = this.nextAction(this.config.watchInwardAction); this.save() },
+  togglePhoneVibration() { this.config.phoneVibration = !this.config.phoneVibration; this.save() },
+  toggleRepeat() { this.config.repeatTwice = !this.config.repeatTwice; this.save() },
+  toggleDucking() { this.config.mediaDucking = !this.config.mediaDucking; this.save() },
+  toggleVolumeKeys() { this.config.volumeKeys = !this.config.volumeKeys; this.save() },
+  delayDown() { this.config.delayMs = Math.max(500, (Number(this.config.delayMs) || 2500) - 500); this.save() },
+  delayUp() { this.config.delayMs = Math.min(10000, (Number(this.config.delayMs) || 2500) + 500); this.save() },
+  rateDown() { this.config.speechRate = Math.max(0.5, Math.round(((Number(this.config.speechRate) || 0.82) - 0.1) * 100) / 100); this.save() },
+  rateUp() { this.config.speechRate = Math.min(1.5, Math.round(((Number(this.config.speechRate) || 0.82) + 0.1) * 100) / 100); this.save() },
+  volumeDown() { this.config.ttsVolume = Math.max(0, (Number(this.config.ttsVolume) || 0) - 10); this.save() },
+  volumeUp() { this.config.ttsVolume = Math.min(100, (Number(this.config.ttsVolume) || 0) + 10); this.save() },
+  toggleUpChoices() { this.upExpanded = !this.upExpanded; this.downExpanded = false },
+  toggleDownChoices() { this.downExpanded = !this.downExpanded; this.upExpanded = false },
+  chooseUp(action) { this.config.volumeUpAction = action; this.upExpanded = false; this.save() },
+  chooseDown(action) { this.config.volumeDownAction = action; this.downExpanded = false; this.save() },
+  save() {
+    this.config.revision = (Number(this.config.revision) || 0) + 1
+    this.config = this.mergeConfig(this.config); this.updateTexts(); this.syncText = '设置已保存'
+    storage.set({ key: 'shared_config', value: JSON.stringify(this.config) })
+    brightness.setKeepScreenOn({ keepScreenOn: this.config.watchKeepOn !== false })
+    if (this.conn) this.conn.send({ data: { type: 'config_update', config: this.config }, success: () => { this.syncText = '设置已同步到手机' }, fail: () => { this.syncText = '已保存在手环，等待手机重连' } })
+  },
+  label(action) { if (action === 'previous') return '上一步'; if (action === 'next') return '下一步'; if (action === 'toggle') return '播放/暂停'; if (action === 'replay') return '重播当前'; if (action === 'faster') return '快一点'; if (action === 'slower') return '慢一点'; return '不操作' },
+  nextAction(action) { const values = ['previous', 'next', 'toggle', 'replay', 'faster', 'slower', 'none']; for (let i = 0; i < values.length; i++) if (values[i] === action) return values[(i + 1) % values.length]; return 'previous' },
+  back() { router.back() }
+}
+</script>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #101016; flex-direction: column; padding: 10px 14px 7px 14px; }.header { width: 308px; height: 46px; flex-direction: row; align-items: center; }.back { width: 86px; height: 39px; border-radius: 14px; color: #ffffff; font-size: 15px; background-color: #262632; }.title { width: 210px; color: #f5f5fa; font-size: 21px; font-weight: bold; text-align: center; }.sync-state { width: 308px; height: 24px; color: #8f8fa3; font-size: 11px; text-align: center; }
+.list { width: 308px; height: 403px; }.section-item { width: 304px; height: 37px; }.section { width: 300px; height: 37px; color: #a985ff; font-size: 17px; font-weight: bold; padding-top: 8px; }.row-item { width: 304px; height: 54px; }.row { width: 300px; height: 48px; margin-bottom: 6px; border-radius: 15px; color: #ffffff; font-size: 15px; background-color: #1d1d27; }.active { background-color: #272135; }.selector { background-color: #332852; }
+.adjust-item { width: 304px; height: 58px; }.adjust { width: 300px; height: 52px; margin-bottom: 6px; padding-left: 12px; padding-right: 8px; border-radius: 15px; background-color: #1d1d27; flex-direction: row; align-items: center; }.adjust-label { width: 112px; color: #ffffff; font-size: 14px; }.adjust-value { width: 72px; color: #cdbdff; font-size: 14px; text-align: center; }.minus, .plus { width: 48px; height: 40px; border-radius: 12px; color: #ffffff; font-size: 19px; background-color: #333342; }.delay-label { width: 76px; }.delay-number { width: 70px; font-size: 13px; }.delay-action { width: 62px; height: 40px; border-radius: 12px; color: #ffffff; font-size: 12px; background-color: #574387; }.slower-action { background-color: #3a3449; }
+.choices-item { width: 304px; height: 330px; }.choices { width: 292px; height: 324px; margin-left: 6px; flex-direction: column; }.choice { width: 292px; height: 42px; margin-bottom: 4px; border-radius: 13px; color: #ffffff; font-size: 15px; background-color: #4a376f; }.danger { background-color: #4b3039; }.note-item { width: 304px; height: 58px; }.note { width: 300px; height: 54px; color: #77778b; font-size: 12px; text-align: center; padding-top: 12px; }
+</style>

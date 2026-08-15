@@ -1,0 +1,517 @@
+<template>
+  <div class="page" ontouchstart="touchStart" ontouchend="touchEnd">
+    <div class="header">
+      <text class="app-name">绕线助手</text>
+      <text class="state {{connected ? 'connected' : 'offline'}}">{{modeText}}</text>
+    </div>
+    <text class="project">{{project}}</text>
+    <div class="number-card">
+      <text class="hint">{{loaded ? '当前钉号' : '等待手机状态'}}</text>
+      <text class="number">{{loaded ? current : '—'}}</text>
+      <text class="progress">{{loaded ? '第 ' + index + ' / ' + total + ' 步 · ' + progressText : statusHint}}</text>
+    </div>
+    <div class="step-controls">
+      <input class="step-btn previous" type="button" value="‹ 上一步" onclick="previousStep" />
+      <input class="step-btn next" type="button" value="下一步 ›" onclick="nextStep" />
+    </div>
+    <div class="play-controls">
+      <input class="play-btn" type="button" value="{{playing ? '暂停播报' : '开始播报'}}" onclick="togglePlayback" />
+      <input class="replay-btn" type="button" value="重播" onclick="replay" />
+    </div>
+    <div class="speed-controls">
+      <input class="speed-btn" type="button" value="慢一点" onclick="slower" />
+      <text class="delay-value">{{delayText}}</text>
+      <input class="speed-btn faster" type="button" value="快一点" onclick="faster" />
+    </div>
+    <div class="tools">
+      <input class="tool-btn" type="button" value="预览" onclick="openPreview" />
+      <input class="tool-btn accent" type="button" value="跳转" onclick="openJump" />
+      <input class="tool-btn" type="button" value="详情" onclick="openDetails" />
+    </div>
+    <div class="bottom-tools">
+      <input class="bottom-btn" type="button" value="存档" onclick="openArchives" />
+      <text class="neighbors">{{previous}} ‹　当前　› {{next}}</text>
+      <input class="bottom-btn" type="button" value="设置" onclick="openSettings" />
+    </div>
+    <text class="footer">{{lastAction}}</text>
+  </div>
+</template>
+
+<script>
+import interconnect from '@system.interconnect'
+import vibrator from '@system.vibrator'
+import sensor from '@system.sensor'
+import storage from '@system.storage'
+import file from '@system.file'
+import brightness from '@system.brightness'
+import router from '@system.router'
+
+const ARCHIVE_DIR = 'internal://files/stringart/'
+const DEFAULT_CONFIG = {
+  revision: 0, repeatTwice: false, delayMs: 2500, speechRate: 0.82,
+  ttsVolume: 100, mediaDucking: true, phoneVibration: false,
+  volumeKeys: false, volumeUpAction: 'previous', volumeDownAction: 'next',
+  watchVibration: true, watchKeepOn: true,
+  watchOutwardAction: 'next', watchInwardAction: 'previous'
+}
+
+export default {
+  private: {
+    conn: null, connected: false, onlineLoaded: false, offlineMode: false,
+    loaded: false, playing: false, project: '等待手机或离线存档',
+    previous: '—', current: '—', next: '—', index: 0, total: 0,
+    nails: 0, bits: 0, crc32: 0, baseIndex: 0, activeArchiveId: '',
+    circleMm: 0, lineMm: 0, estimatedMeters: 0,
+    modeText: '连接中', statusHint: '正在读取最近状态', progressText: '0%',
+    lastAction: '正在恢复进度', requestId: 0, delayText: '间隔 2.5 秒',
+    touchX: 0, touchY: 0, touchAt: 0, config: DEFAULT_CONFIG,
+    wristSubscribed: false, rollBaseline: 0, rollReady: false, lastWristAt: 0,
+    pending: null, pendingCrc: 0xffffffff, pendingThumbCrc: 0xffffffff,
+    pendingPreviewCrc: 0xffffffff, offlineTimer: null
+  },
+
+  onInit() {
+    file.mkdir({ uri: ARCHIVE_DIR, recursive: true })
+    this.loadConfig(() => { this.applyScreenMode(); this.startWristSensor() })
+    this.loadCachedState()
+    this.loadActiveArchive()
+    this.openConnection()
+  },
+  onShow() {
+    this.loadConfig(() => { this.applyScreenMode(); this.startWristSensor() })
+    this.loadCachedState()
+    this.loadActiveArchive()
+    this.openConnection()
+  },
+  onHide() { this.stopWristSensor() },
+  onDestroy() { this.stopOfflinePlayback(); this.stopWristSensor(); brightness.setKeepScreenOn({ keepScreenOn: false }) },
+
+  loadConfig(done) {
+    storage.get({ key: 'shared_config', default: JSON.stringify(DEFAULT_CONFIG),
+      success: value => {
+        try { this.config = Object.assign({}, DEFAULT_CONFIG, JSON.parse(value)) }
+        catch (e) { this.config = Object.assign({}, DEFAULT_CONFIG) }
+        this.updateDelayText()
+        if (done) done()
+      }, fail: () => { this.config = Object.assign({}, DEFAULT_CONFIG); this.updateDelayText(); if (done) done() }
+    })
+  },
+  applyScreenMode() {
+    brightness.setKeepScreenOn({ keepScreenOn: this.config.watchKeepOn !== false,
+      fail: () => { this.lastAction = '当前系统未开放常亮接口' } })
+  },
+
+  loadCachedState() {
+    storage.get({ key: 'last_phone_state', default: '', success: value => {
+      if (!value || this.offlineMode) return
+      try {
+        const state = JSON.parse(value)
+        if (state && state.loaded) {
+          this.applyOnlineState(state, false)
+          this.modeText = '最近状态'
+          this.lastAction = '显示手机最近一次状态'
+        }
+      } catch (e) {}
+    }})
+  },
+
+  openConnection() {
+    if (!this.conn) this.conn = interconnect.instance()
+    this.conn.onmessage = event => this.receiveMessage(event)
+    this.conn.onopen = () => {
+      this.connected = true; this.onlineLoaded = false; this.modeText = '已连接'
+      this.send({ type: 'request_state' }); this.send({ type: 'request_config' })
+      this.pushOfflineProgress()
+    }
+    this.conn.onclose = () => { this.connected = false; this.onlineLoaded = false; this.modeText = this.loaded ? '最近状态' : '已断开'; this.loadActiveArchive() }
+    this.conn.onerror = () => { this.connected = false; this.onlineLoaded = false; this.modeText = this.loaded ? '最近状态' : '连接失败'; this.loadActiveArchive() }
+    this.conn.getReadyState({ success: result => {
+      this.connected = result.status === 1
+      if (this.connected) { this.send({ type: 'request_state' }); this.send({ type: 'request_config' }) }
+    }})
+  },
+
+  receiveMessage(event) {
+    const message = this.parseMessage(event)
+    if (!message || !message.type) return
+    if (message.type === 'state') { this.receiveOnlineState(message); return }
+    if (message.type === 'phone_next_feedback') { this.feedback(); return }
+    if (message.type === 'config_state') {
+      this.config = Object.assign({}, DEFAULT_CONFIG, message.config || {})
+      storage.set({ key: 'shared_config', value: JSON.stringify(this.config) })
+      this.updateDelayText(); this.applyScreenMode()
+      if (this.offlineMode && this.playing) this.scheduleOfflineStep()
+      return
+    }
+    if (message.type === 'archive_header') { this.beginArchive(message); return }
+    if (message.type === 'archive_chunk') { this.writeArchiveChunk(message, 'data'); return }
+    if (message.type === 'archive_thumbnail') { this.writeArchiveChunk(message, 'thumb'); return }
+    if (message.type === 'archive_preview') { this.writeArchiveChunk(message, 'preview'); return }
+    if (message.type === 'archive_end') { this.finishArchive(message); return }
+    if (message.type === 'archive_sync_complete') {
+      this.ack(message.part); this.lastAction = '全部存档同步完成'; this.loadActiveArchive(); return
+    }
+  },
+
+  receiveOnlineState(message) {
+    storage.set({ key: 'last_phone_state', value: JSON.stringify(message) })
+    this.connected = true; this.onlineLoaded = !!message.loaded
+    this.applyOnlineState(message, true)
+  },
+  applyOnlineState(message, live) {
+    this.stopOfflinePlayback()
+    this.offlineMode = false; this.modeText = live ? '手机遥控' : '最近状态'; this.loaded = !!message.loaded
+    this.playing = !!message.playing; this.project = message.project || '手机播报器'
+    this.index = Number(message.index) || 0; this.total = Number(message.total) || 0
+    this.nails = Number(message.nails) || 0; this.circleMm = Number(message.circleMm) || 0
+    this.lineMm = Number(message.lineMm) || 0; this.estimatedMeters = Number(message.estimatedMeters) || 0
+    this.previous = this.valueText(message.previous); this.current = this.valueText(message.current)
+    this.next = this.valueText(message.next); this.updateProgressText()
+    this.statusHint = this.loaded ? '' : '请先在手机端载入序列'
+    this.lastAction = this.loaded ? (live ? '已同步手机当前状态' : '已恢复最近状态') : '请在手机端载入序列'
+  },
+  valueText(value) { return value === null || value === undefined ? '—' : String(value) },
+  updateDelayText() {
+    this.delayText = '间隔 ' + (Math.round((Number(this.config.delayMs) || 2500) / 100) / 10) + ' 秒'
+  },
+  updateProgressText() {
+    this.progressText = this.total > 0 ? (Math.round(this.index * 1000 / this.total) / 10) + '%' : '0%'
+  },
+
+  beginArchive(message) {
+    message.diskFormat = 2
+    this.pending = message; this.pendingCrc = 0xffffffff
+    this.pendingThumbCrc = 0xffffffff; this.pendingPreviewCrc = 0xffffffff
+    file.delete({ uri: this.dataUri(message.archiveId), complete: () => {
+      file.delete({ uri: this.thumbUri(message.archiveId), complete: () => {
+        file.delete({ uri: this.previewUri(message.archiveId), complete: () => this.ack(message.part) })
+      }})
+    }})
+  },
+  writeArchiveChunk(message, kind) {
+    if (!this.pending || this.pending.archiveId !== message.archiveId) return
+    const bytes = this.decodeBase64(message.data || '')
+    if (kind === 'data') this.pendingCrc = this.crcUpdate(this.pendingCrc, bytes)
+    if (kind === 'thumb') this.pendingThumbCrc = this.crcUpdate(this.pendingThumbCrc, bytes)
+    if (kind === 'preview') this.pendingPreviewCrc = this.crcUpdate(this.pendingPreviewCrc, bytes)
+    let uri = this.dataUri(message.archiveId)
+    if (kind === 'thumb') uri = this.thumbUri(message.archiveId)
+    if (kind === 'preview') uri = this.previewUri(message.archiveId)
+    const offset = Number(message.offset) || 0
+    file.writeArrayBuffer({ uri: uri, buffer: bytes, position: offset, append: offset > 0,
+      success: () => this.ack(message.part),
+      fail: () => { this.lastAction = '存档写入失败，请重试同步' }
+    })
+  },
+  finishArchive(message) {
+    if (!this.pending || this.pending.archiveId !== message.archiveId) return
+    const received = (this.pendingCrc ^ 0xffffffff) >>> 0
+    const expected = Number(this.pending.crc32) >>> 0
+    if (received !== expected) { this.lastAction = '接收数据校验失败，请重试同步'; return }
+    const meta = this.pending
+    file.get({ uri: this.dataUri(meta.archiveId), success: info => {
+      if ((Number(info.length) || 0) !== (Number(meta.bytes) || 0)) {
+        this.lastAction = '存档落盘长度异常，请重试同步'; return
+      }
+      file.readArrayBuffer({ uri: this.dataUri(meta.archiveId), success: data => {
+        const bytes = this.bufferBytes(data)
+        const diskCrc = (this.crcUpdate(0xffffffff, bytes) ^ 0xffffffff) >>> 0
+        if (diskCrc !== expected) { this.lastAction = '存档落盘校验失败，请重试同步'; return }
+        this.verifySidecar(this.thumbUri(meta.archiveId), Number(meta.thumbnailBytes) || 0,
+          Number(meta.thumbnailCrc32) >>> 0, '缩略图', okThumb => {
+          if (!okThumb) return
+          this.verifySidecar(this.previewUri(meta.archiveId), Number(meta.previewBytes) || 0,
+            Number(meta.previewCrc32) >>> 0, '进度预览', okPreview => {
+            if (!okPreview) return
+            this.upsertArchive(meta, () => {
+              const id = meta.archiveId; this.pending = null; this.ack(message.part)
+              storage.get({ key: 'active_archive_id', default: '', success: current => {
+                if (!current) storage.set({ key: 'active_archive_id', value: id, success: () => this.loadActiveArchive() })
+              }})
+            })
+          })
+        })
+      }, fail: () => { this.lastAction = '无法复核手环存档，请重试同步' } })
+    }, fail: () => { this.lastAction = '手环存档未写入，请重试同步' } })
+  },
+  verifySidecar(uri, expectedLength, expectedCrc, label, done) {
+    if (expectedLength < 1) { done(true); return }
+    file.get({ uri: uri, success: info => {
+      if ((Number(info.length) || 0) !== expectedLength) { this.lastAction = label + '长度异常，请重试同步'; done(false); return }
+      file.readArrayBuffer({ uri: uri, success: data => {
+        const bytes = this.bufferBytes(data)
+        const crc = (this.crcUpdate(0xffffffff, bytes) ^ 0xffffffff) >>> 0
+        if (crc !== expectedCrc) { this.lastAction = label + '校验失败，请重试同步'; done(false); return }
+        done(true)
+      }, fail: () => { this.lastAction = '无法读取' + label + '，请重试同步'; done(false) } })
+    }, fail: () => { this.lastAction = label + '未写入，请重试同步'; done(false) } })
+  },
+  upsertArchive(meta, done) {
+    storage.get({ key: 'archive_list', default: '[]', success: value => {
+      let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+      let found = false
+      for (let i = 0; i < list.length; i++) if (list[i].archiveId === meta.archiveId) {
+        list[i] = meta; found = true; break
+      }
+      if (!found) list.unshift(meta)
+      storage.set({ key: 'archive_list', value: JSON.stringify(list), success: () => { if (done) done() } })
+    }})
+  },
+  ack(part) { this.send({ type: 'archive_ack', part: part }) },
+
+  loadActiveArchive() {
+    storage.get({ key: 'active_archive_id', default: '', success: id => {
+      if (!id) return
+      storage.get({ key: 'archive_list', default: '[]', success: value => {
+        let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+        for (let i = 0; i < list.length; i++) if (list[i].archiveId === id) {
+          const meta = list[i]; this.activeArchiveId = id
+          if (this.connected && this.onlineLoaded) return
+          this.offlineMode = true
+          if (Number(meta.diskFormat) !== 2) {
+            this.loaded = false; this.playing = false; this.project = meta.name || '旧版离线存档'
+            this.previous = '—'; this.current = '—'; this.next = '—'; this.index = 0; this.total = 0
+            this.modeText = '需要重同步'; this.statusHint = '请在手机端同步全部存档'
+            this.lastAction = '旧版存档可能已损坏，已停止读取'; return
+          }
+          this.loaded = true; this.playing = false; this.project = meta.name || meta.source || '离线存档'
+          this.total = Number(meta.total) || 0; this.nails = Number(meta.nails) || 0; this.bits = Number(meta.bits) || 0
+          this.circleMm = Number(meta.circleMm) || 0; this.lineMm = Number(meta.lineMm) || 0
+          this.estimatedMeters = Number(meta.estimatedMeters) || 0
+          this.crc32 = Number(meta.crc32) || 0; this.baseIndex = meta.syncedIndex === undefined ? (Number(meta.index) || 0) : Number(meta.syncedIndex)
+          this.index = Math.max(1, Math.min((Number(meta.index) || 0) + 1, this.total))
+          this.modeText = '离线存档'; this.updateProgressText(); this.refreshOfflineNumbers(false); return
+        }
+      }})
+    }})
+  },
+  refreshOfflineNumbers(saveAfter) {
+    const zero = Math.max(0, this.index - 1)
+    this.readNail(zero, value => {
+      this.current = this.valueText(value)
+      if (saveAfter) this.saveOfflineProgress()
+    })
+    if (zero > 0) this.readNail(zero - 1, value => { this.previous = this.valueText(value) }); else this.previous = '—'
+    if (zero + 1 < this.total) this.readNail(zero + 1, value => { this.next = this.valueText(value) }); else this.next = '—'
+    this.lastAction = '离线进度已保存'; this.updateProgressText()
+  },
+  readNail(step, done) {
+    if (!this.activeArchiveId || this.bits < 1) { done(null); return }
+    const bitStart = step * this.bits; const byteStart = Math.floor(bitStart / 8)
+    const shift = bitStart - byteStart * 8; const length = Math.ceil((shift + this.bits) / 8)
+    file.readArrayBuffer({ uri: this.dataUri(this.activeArchiveId), position: byteStart, length: length,
+      success: data => {
+        const bytes = this.bufferBytes(data)
+        let value = 0
+        for (let bit = 0; bit < this.bits; bit++) {
+          const p = shift + bit
+          const byte = Number(bytes[p >> 3]) || 0
+          if (((byte >>> (p & 7)) & 1) !== 0) value += Math.pow(2, bit)
+        }
+        done(value)
+      }, fail: () => done(null) })
+  },
+  saveOfflineProgress() {
+    storage.get({ key: 'archive_list', default: '[]', success: value => {
+      let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+      for (let i = 0; i < list.length; i++) if (list[i].archiveId === this.activeArchiveId) {
+        list[i].index = this.index - 1
+        if (this.current !== '—') list[i].current = Number(this.current)
+      }
+      storage.set({ key: 'archive_list', value: JSON.stringify(list) })
+    }})
+    this.pushOfflineProgress()
+  },
+  pushOfflineProgress() {
+    if (this.connected && this.offlineMode && this.activeArchiveId)
+      this.send({ type: 'archive_progress', archiveId: this.activeArchiveId,
+        index: Math.max(0, this.index - 1), baseIndex: this.baseIndex, crc32: this.crc32 })
+  },
+
+  command(action, label) {
+    this.feedback(); this.lastAction = label
+    if (this.offlineMode) {
+      if (action === 'toggle') {
+        if (this.playing) { this.stopOfflinePlayback(); this.lastAction = '已暂停独立播报' }
+        else { this.playing = true; this.lastAction = '手环独立播报中'; this.scheduleOfflineStep() }
+        return
+      }
+      if (action === 'next' && this.index < this.total) this.index++
+      else if (action === 'previous' && this.index > 1) this.index--
+      else if (action === 'replay') { this.lastAction = '已重播当前钉号' }
+      if (this.playing) this.scheduleOfflineStep()
+      this.refreshOfflineNumbers(true); return
+    }
+    if (!this.connected) { this.lastAction = '尚未连接手机，当前显示最近状态'; this.openConnection(); return }
+    this.requestId++; this.send({ type: 'command', action: action, requestId: this.requestId })
+  },
+  previousStep() { this.command('previous', '上一步') },
+  nextStep() { this.command('next', '下一步') },
+  togglePlayback() { this.command('toggle', this.playing ? '暂停' : '播放') },
+  replay() { this.command('replay', '重播当前') },
+  faster() { this.adjustDelay(-500) },
+  slower() { this.adjustDelay(500) },
+  adjustDelay(delta) {
+    const before = Number(this.config.delayMs) || 2500
+    const after = Math.max(500, Math.min(10000, before + delta))
+    this.feedback()
+    if (after === before) { this.lastAction = delta < 0 ? '已经是最快间隔' : '已经是最慢间隔'; return }
+    this.config.delayMs = after; this.config.revision = (Number(this.config.revision) || 0) + 1
+    this.updateDelayText(); this.lastAction = (delta < 0 ? '已加快，等待 ' : '已减慢，等待 ') + (after / 1000) + ' 秒'
+    storage.set({ key: 'shared_config', value: JSON.stringify(this.config) })
+    if (this.offlineMode && this.playing) this.scheduleOfflineStep()
+    if (this.conn) this.conn.send({ data: { type: 'config_update', config: this.config }, fail: () => { this.connected = false } })
+  },
+  scheduleOfflineStep() {
+    if (this.offlineTimer !== null) clearTimeout(this.offlineTimer)
+    if (!this.offlineMode || !this.playing) { this.offlineTimer = null; return }
+    const wait = Math.max(500, Math.min(10000, Number(this.config.delayMs) || 2500))
+    this.offlineTimer = setTimeout(() => this.advanceOfflinePlayback(), wait)
+  },
+  advanceOfflinePlayback() {
+    this.offlineTimer = null
+    if (!this.offlineMode || !this.playing) return
+    if (this.index >= this.total) {
+      this.playing = false; this.lastAction = '离线序列播报完成'
+      if (this.config.watchVibration !== false) vibrator.vibrate({ mode: 'long' })
+      return
+    }
+    this.index++; this.feedback(); this.refreshOfflineNumbers(true); this.scheduleOfflineStep()
+  },
+  stopOfflinePlayback() {
+    if (this.offlineTimer !== null) clearTimeout(this.offlineTimer)
+    this.offlineTimer = null; this.playing = false
+  },
+  performAction(action) {
+    if (action === 'previous') this.previousStep()
+    else if (action === 'next') this.nextStep()
+    else if (action === 'toggle') this.togglePlayback()
+    else if (action === 'replay') this.replay()
+    else if (action === 'faster') this.faster()
+    else if (action === 'slower') this.slower()
+  },
+  feedback() { if (this.config.watchVibration !== false) vibrator.vibrate({ mode: 'long' }) },
+  send(payload) { if (!this.conn) return; this.conn.send({ data: payload, fail: () => { this.connected = false } }) },
+
+  touchStart(event) {
+    const p = event && event.touches && event.touches.length ? event.touches[0] : event
+    this.touchX = p && (p.clientX !== undefined ? p.clientX : p.pageX) || 0
+    this.touchY = p && (p.clientY !== undefined ? p.clientY : p.pageY) || 0; this.touchAt = Date.now()
+  },
+  touchEnd(event) {
+    const p = event && event.changedTouches && event.changedTouches.length ? event.changedTouches[0] : event
+    const x = p && (p.clientX !== undefined ? p.clientX : p.pageX) || this.touchX
+    const y = p && (p.clientY !== undefined ? p.clientY : p.pageY) || this.touchY
+    const dx = x - this.touchX, dy = y - this.touchY
+    if (Date.now() - this.touchAt > 650 || Math.abs(dx) < 72 || Math.abs(dx) < 1.35 * Math.abs(dy)) return
+    if (dx < 0) this.nextStep(); else this.previousStep()
+  },
+
+  startWristSensor() {
+    if (this.wristSubscribed) return
+    if ((this.config.watchOutwardAction || 'none') === 'none' && (this.config.watchInwardAction || 'none') === 'none') return
+    this.wristSubscribed = true; this.rollReady = false
+    sensor.subscribeAccelerometer({ interval: 'ui', callback: value => this.handleAcceleration(value),
+      fail: () => { this.wristSubscribed = false; this.lastAction = '当前系统未开放加速度计' } })
+  },
+  stopWristSensor() { if (this.wristSubscribed) sensor.unsubscribeAccelerometer(); this.wristSubscribed = false; this.rollReady = false },
+  handleAcceleration(value) {
+    if (!value || typeof value.y !== 'number' || typeof value.z !== 'number') return
+    const roll = Math.atan2(value.y, value.z)
+    if (!this.rollReady) { this.rollBaseline = roll; this.rollReady = true; return }
+    let delta = roll - this.rollBaseline
+    if (delta > Math.PI) delta -= Math.PI * 2; if (delta < -Math.PI) delta += Math.PI * 2
+    this.rollBaseline = this.rollBaseline * 0.90 + roll * 0.10
+    const now = Date.now(); if (now - this.lastWristAt < 950 || Math.abs(delta) < 0.72) return
+    this.lastWristAt = now
+    this.performAction(delta > 0 ? this.config.watchOutwardAction : this.config.watchInwardAction)
+  },
+
+  openArchives() { router.push({ uri: '/pages/archives' }) },
+  openSettings() { router.push({ uri: '/pages/settings' }) },
+  openPreview() { router.push({ uri: '/pages/preview' }) },
+  openJump() {
+    router.push({
+      uri: '/pages/jump',
+      params: {
+        initialReady: this.loaded,
+        initialOnline: this.connected && this.onlineLoaded && !this.offlineMode,
+        initialConnected: this.connected,
+        initialArchiveId: this.offlineMode ? this.activeArchiveId : '',
+        initialProject: this.project,
+        initialCurrent: this.index,
+        initialTotal: this.total,
+        initialCurrentNail: this.current,
+        initialBits: this.bits,
+        initialCrc32: this.crc32,
+        initialBaseIndex: this.baseIndex
+      }
+    })
+  },
+  openDetails() { router.push({ uri: '/pages/details' }) },
+  dataUri(id) { return ARCHIVE_DIR + id + '.bin' },
+  thumbUri(id) { return ARCHIVE_DIR + id + '.jpg' },
+  previewUri(id) { return ARCHIVE_DIR + id + '.preview.jpg' },
+  bufferBytes(data) {
+    const raw = data && data.buffer !== undefined ? data.buffer : data
+    if (raw && raw.length !== undefined) return raw
+    return new Uint8Array(raw || 0)
+  },
+  parseMessage(event) {
+    let data = event && event.data !== undefined ? event.data : event
+    if (data && data.data !== undefined && data.type === undefined) data = data.data
+    if (typeof data !== 'string' && data && (data.length !== undefined || data.byteLength !== undefined || data.buffer !== undefined))
+      data = this.decodeUtf8(this.bufferBytes(data))
+    try { return typeof data === 'string' ? JSON.parse(data) : data }
+    catch (e) { this.lastAction = '收到无法识别的手机消息'; return null }
+  },
+  decodeUtf8(bytes) {
+    let output = ''
+    for (let i = 0; i < bytes.length; i++) {
+      let c = Number(bytes[i]) & 255
+      if (c < 128) output += String.fromCharCode(c)
+      else if (c < 224 && i + 1 < bytes.length) output += String.fromCharCode(((c & 31) << 6) | (Number(bytes[++i]) & 63))
+      else if (c < 240 && i + 2 < bytes.length) output += String.fromCharCode(((c & 15) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63))
+      else if (i + 3 < bytes.length) { let code = ((c & 7) << 18) | ((Number(bytes[++i]) & 63) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63); code -= 65536; output += String.fromCharCode(55296 + (code >> 10), 56320 + (code & 1023)) }
+    }
+    return output
+  },
+  decodeBase64(text) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    let buffer = 0, bits = 0, output = []
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '=') break
+      const value = chars.indexOf(text[i]); if (value < 0) continue
+      buffer = (buffer << 6) | value; bits += 6
+      if (bits >= 8) { bits -= 8; output.push((buffer >> bits) & 255) }
+    }
+    return new Uint8Array(output)
+  },
+  crcUpdate(crc, bytes) {
+    let c = crc >>> 0
+    for (let i = 0; i < bytes.length; i++) {
+      c = (c ^ bytes[i]) >>> 0
+      for (let k = 0; k < 8; k++) c = ((c >>> 1) ^ ((c & 1) ? 0xedb88320 : 0)) >>> 0
+    }
+    return c >>> 0
+  }
+}
+</script>
+
+<style>
+.page { width: 336px; height: 480px; padding: 12px 14px 7px 14px; flex-direction: column; background-color: #101016; }
+.header { width: 308px; height: 31px; flex-direction: row; justify-content: space-between; align-items: center; }
+.app-name { color: #f5f5fa; font-size: 20px; font-weight: bold; }
+.state { width: 78px; height: 25px; border-radius: 13px; text-align: center; font-size: 12px; color: #ffffff; }
+.connected { background-color: #188759; } .offline { background-color: #484f60; }
+.project { width: 308px; height: 22px; color: #9d9dae; font-size: 13px; text-align: center; lines: 1; text-overflow: ellipsis; }
+.number-card { width: 308px; height: 113px; border-radius: 23px; flex-direction: column; justify-content: center; align-items: center; background-color: #1d1d27; }
+.hint { height: 21px; color: #9d9dae; font-size: 15px; }.number { width: 286px; height: 63px; color: #ffffff; font-size: 60px; font-weight: bold; text-align: center; }
+.progress { height: 22px; color: #85859a; font-size: 12px; }.step-controls { width: 308px; height: 62px; margin-top: 4px; flex-direction: row; justify-content: space-between; }
+.step-btn { width: 150px; height: 58px; border-radius: 18px; color: #ffffff; font-size: 19px; font-weight: bold; }.previous { background-color: #30303e; }.next { background-color: #9769ff; }
+.play-controls { width: 308px; height: 52px; flex-direction: row; justify-content: space-between; }.play-btn { width: 208px; height: 48px; border-radius: 16px; color: #ffffff; font-size: 17px; background-color: #d94e76; }.replay-btn { width: 92px; height: 48px; border-radius: 16px; color: #ffffff; font-size: 15px; background-color: #30303e; }
+.speed-controls { width: 308px; height: 42px; flex-direction: row; justify-content: space-between; align-items: center; }.speed-btn { width: 92px; height: 38px; border-radius: 14px; color: #ffffff; font-size: 15px; background-color: #3a3449; }.faster { background-color: #574387; }.delay-value { width: 116px; height: 32px; color: #cdbdff; font-size: 14px; text-align: center; }
+.tools { width: 308px; height: 47px; flex-direction: row; justify-content: space-between; }.tool-btn { width: 98px; height: 43px; border-radius: 15px; color: #ffffff; font-size: 15px; background-color: #262632; }.accent { background-color: #6247a8; }
+.bottom-tools { width: 308px; height: 41px; flex-direction: row; justify-content: space-between; align-items: center; }.bottom-btn { width: 68px; height: 36px; border-radius: 13px; color: #ffffff; font-size: 13px; background-color: #262632; }.neighbors { width: 164px; height: 32px; color: #c1c1d1; font-size: 14px; text-align: center; }
+.footer { width: 308px; height: 18px; color: #66667a; text-align: center; font-size: 10px; lines: 1; text-overflow: ellipsis; }
+</style>

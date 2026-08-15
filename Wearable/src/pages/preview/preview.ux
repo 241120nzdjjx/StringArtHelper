@@ -1,0 +1,191 @@
+<template>
+  <div class="page">
+    <div class="header"><input class="back" type="button" value="‹ 返回" onclick="back"/><text class="title">绕线预览</text></div>
+    <text class="project">{{project}}</text>
+    <stack class="viewport" ontouchstart="touchStart" ontouchmove="touchMove" ontouchend="touchEnd">
+      <div class="placeholder"><text class="placeholder-text">{{loadingText}}</text></div>
+      <image class="preview" src="{{imageUri}}" style="width: {{imageSize}}px; height: {{imageSize}}px; left: {{imageLeft}}px; top: {{imageTop}}px;"></image>
+    </stack>
+    <text class="step">第 {{index}} / {{total}} 步　{{currentText}}</text>
+    <div class="controls">
+      <input class="control" type="button" value="－" onclick="zoomOut"/>
+      <input class="control reset" type="button" value="{{zoomText}}" onclick="resetView"/>
+      <input class="control" type="button" value="＋" onclick="zoomIn"/>
+      <input class="control refresh" type="button" value="刷新" onclick="requestPreview"/>
+    </div>
+    <text class="hint">拖动查看 · 预览显示已完成线段、当前线和当前钉位</text>
+  </div>
+</template>
+
+<script>
+import storage from '@system.storage'
+import file from '@system.file'
+import interconnect from '@system.interconnect'
+import router from '@system.router'
+
+const DIR = 'internal://files/stringart/'
+export default {
+  private: {
+    conn: null, archiveId: '', project: '当前项目', index: 0, total: 0, currentText: '',
+    imageUri: '', imageSize: 280, imageLeft: 0, imageTop: 0, zoomText: '1.0×', connected: false,
+    touchX: 0, touchY: 0, startLeft: 0, startTop: 0, dragging: false, liveSlot: 0,
+    loadingText: '正在读取预览…'
+  },
+  onInit() { this.load(); this.connect() },
+  onShow() { this.load(); this.connect() },
+  connect() {
+    if (!this.conn) this.conn = interconnect.instance()
+    this.conn.onmessage = event => {
+      const data = this.parseMessage(event)
+      if (data && data.type === 'preview_image') this.receivePreview(data)
+      if (data && data.type === 'state') {
+        this.connected = true; this.archiveId = ''
+        const changed = (Number(data.index) || 0) !== this.index
+        this.index = Number(data.index) || 0; this.total = Number(data.total) || 0
+        this.currentText = data.current === null || data.current === undefined ? '' : '钉号 ' + data.current
+        this.project = data.project || this.project
+        if (changed) this.requestPreview()
+      }
+    }
+    this.conn.onopen = () => { this.connected = true; this.archiveId = ''; this.loadPhoneState(); this.requestPreview() }
+    this.conn.onclose = () => { this.connected = false }
+    this.conn.getReadyState({ success: state => {
+      if (state.status === 1) { this.connected = true; this.archiveId = ''; this.loadPhoneState(); this.requestPreview() }
+    } })
+  },
+  load() {
+    storage.get({ key: 'active_archive_id', default: '', success: id => {
+      if (this.connected) { this.archiveId = ''; this.loadPhoneState(); return }
+      this.archiveId = id || ''
+      if (this.archiveId) {
+        storage.get({ key: 'archive_list', default: '[]', success: value => {
+          let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+          for (let i = 0; i < list.length; i++) if (list[i].archiveId === this.archiveId) {
+            const meta = list[i]
+            this.project = meta.name || meta.source || '离线存档'
+            this.index = (Number(meta.index) || 0) + 1; this.total = Number(meta.total) || 0
+            this.imageUri = DIR + this.archiveId + '.preview.jpg'
+            this.loadingText = '未找到进度预览，将显示存档缩略图'
+            file.access({ uri: this.imageUri, fail: () => { this.imageUri = DIR + this.archiveId + '.jpg' } })
+            this.requestPreview(); return
+          }
+        }})
+      } else this.loadPhoneState()
+    }})
+  },
+  loadPhoneState() {
+    storage.get({ key: 'last_phone_state', default: '', success: value => {
+      try {
+        const state = JSON.parse(value || '{}')
+        this.project = state.project || '手机当前项目'; this.index = Number(state.index) || 0
+        this.total = Number(state.total) || 0
+        this.currentText = state.current === null || state.current === undefined ? '' : '钉号 ' + state.current
+      } catch (e) {}
+      this.requestPreview()
+    }})
+  },
+  requestPreview() {
+    if (!this.conn) return
+    this.loadingText = '正在从手机生成当前进度预览…'
+    this.conn.send({ data: { type: 'request_preview', archiveId: this.archiveId,
+      index: Math.max(0, this.index - 1) } })
+  },
+  receivePreview(message) {
+    const bytes = this.decodeBase64(message.data || '')
+    if (!bytes.length) { this.loadingText = '当前没有可预览的序列'; return }
+    this.liveSlot = this.liveSlot ? 0 : 1
+    const uri = DIR + 'live-preview-' + this.liveSlot + '.jpg'
+    file.writeArrayBuffer({ uri: uri, buffer: bytes, position: 0,
+      success: () => {
+        this.imageUri = uri; this.index = Number(message.index) || this.index
+        this.total = Number(message.total) || this.total; this.loadingText = ''
+      }, fail: () => { this.loadingText = '预览写入失败，请重试' }
+    })
+  },
+  zoomIn() { this.setZoom(Math.min(1680, Math.round(this.imageSize * 1.5))) },
+  zoomOut() { this.setZoom(Math.max(280, Math.round(this.imageSize / 1.5))) },
+  resetView() { this.imageSize = 280; this.imageLeft = 0; this.imageTop = 0; this.zoomText = '1.0×' },
+  setZoom(size) {
+    const oldSize = Math.max(1, this.imageSize)
+    const focusX = (140 - this.imageLeft) / oldSize
+    const focusY = (140 - this.imageTop) / oldSize
+    this.imageSize = size
+    this.moveImage(140 - focusX * size, 140 - focusY * size)
+    this.zoomText = (Math.round(size * 10 / 280) / 10) + '×'
+  },
+  touchStart(event) {
+    const p = event && event.touches && event.touches.length ? event.touches[0] : event
+    this.touchX = p && (p.clientX !== undefined ? p.clientX : p.pageX) || 0
+    this.touchY = p && (p.clientY !== undefined ? p.clientY : p.pageY) || 0
+    this.startLeft = this.imageLeft; this.startTop = this.imageTop
+    this.dragging = true
+  },
+  touchMove(event) {
+    if (!this.dragging) return
+    const p = event && event.touches && event.touches.length ? event.touches[0] : event
+    const x = p && (p.clientX !== undefined ? p.clientX : p.pageX)
+    const y = p && (p.clientY !== undefined ? p.clientY : p.pageY)
+    if (x === undefined || y === undefined) return
+    this.moveImage(this.startLeft + x - this.touchX, this.startTop + y - this.touchY)
+    if (event && event.stopPropagation) event.stopPropagation()
+  },
+  touchEnd(event) {
+    const p = event && event.changedTouches && event.changedTouches.length ? event.changedTouches[0] : event
+    const x = p && (p.clientX !== undefined ? p.clientX : p.pageX) || this.touchX
+    const y = p && (p.clientY !== undefined ? p.clientY : p.pageY) || this.touchY
+    this.moveImage(this.startLeft + x - this.touchX, this.startTop + y - this.touchY)
+    this.dragging = false
+  },
+  moveImage(left, top) {
+    if (this.imageSize <= 280) {
+      this.imageLeft = Math.round((280 - this.imageSize) / 2)
+      this.imageTop = Math.round((280 - this.imageSize) / 2)
+      return
+    }
+    const minimum = 280 - this.imageSize
+    this.imageLeft = Math.max(minimum, Math.min(0, Math.round(left)))
+    this.imageTop = Math.max(minimum, Math.min(0, Math.round(top)))
+  },
+  parseMessage(event) {
+    let data = event && event.data !== undefined ? event.data : event
+    if (data && data.data !== undefined && data.type === undefined) data = data.data
+    if (typeof data !== 'string' && data && (data.length !== undefined || data.byteLength !== undefined || data.buffer !== undefined)) {
+      const raw = data.buffer !== undefined ? data.buffer : data
+      const bytes = raw && raw.length !== undefined ? raw : new Uint8Array(raw || 0)
+      data = this.decodeUtf8(bytes)
+    }
+    try { return typeof data === 'string' ? JSON.parse(data) : data } catch (e) { return null }
+  },
+  decodeUtf8(bytes) {
+    let output = ''
+    for (let i = 0; i < bytes.length; i++) {
+      let c = Number(bytes[i]) & 255
+      if (c < 128) output += String.fromCharCode(c)
+      else if (c < 224 && i + 1 < bytes.length) output += String.fromCharCode(((c & 31) << 6) | (Number(bytes[++i]) & 63))
+      else if (c < 240 && i + 2 < bytes.length) output += String.fromCharCode(((c & 15) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63))
+      else if (i + 3 < bytes.length) { let code = ((c & 7) << 18) | ((Number(bytes[++i]) & 63) << 12) | ((Number(bytes[++i]) & 63) << 6) | (Number(bytes[++i]) & 63); code -= 65536; output += String.fromCharCode(55296 + (code >> 10), 56320 + (code & 1023)) }
+    }
+    return output
+  },
+  decodeBase64(text) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    let buffer = 0, bits = 0, output = []
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '=') break
+      const value = chars.indexOf(text[i]); if (value < 0) continue
+      buffer = (buffer << 6) | value; bits += 6
+      if (bits >= 8) { bits -= 8; output.push((buffer >> bits) & 255) }
+    }
+    return new Uint8Array(output)
+  },
+  back() { router.back() }
+}
+</script>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #101016; flex-direction: column; padding: 10px 14px 7px 14px; align-items: center; }
+.header { width: 308px; height: 46px; flex-direction: row; align-items: center; }.back { width: 84px; height: 39px; border-radius: 14px; color: #ffffff; font-size: 15px; background-color: #262632; }.title { width: 216px; color: #f5f5fa; font-size: 21px; font-weight: bold; text-align: center; }
+.project { width: 308px; height: 23px; color: #9d9dae; font-size: 13px; text-align: center; lines: 1; text-overflow: ellipsis; }
+.viewport { width: 280px; height: 280px; border-radius: 22px; background-color: #f7f6fa; overflow: hidden; }.placeholder { width: 280px; height: 280px; justify-content: center; align-items: center; }.placeholder-text { width: 230px; color: #77778b; font-size: 14px; text-align: center; }.preview { position: absolute; object-fit: contain; }
+.step { width: 308px; height: 27px; color: #ffffff; font-size: 15px; text-align: center; }.controls { width: 308px; height: 53px; flex-direction: row; justify-content: space-between; }.control { width: 60px; height: 48px; border-radius: 15px; color: #ffffff; font-size: 20px; background-color: #30303e; }.reset { width: 78px; font-size: 15px; }.refresh { width: 78px; font-size: 15px; background-color: #9769ff; }.hint { width: 308px; height: 26px; color: #66667a; font-size: 11px; text-align: center; }
+</style>

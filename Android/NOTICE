@@ -1,0 +1,22 @@
+绕线助手 / String Art Helper
+Copyright (C) 2026 牛杂の经济学
+
+Licensed under the GNU General Public License, version 3 only.
+SPDX-License-Identifier: GPL-3.0-only
+
+Modified distributions must comply with GPL-3.0-only and the compatible
+additional terms in ADDITIONAL_TERMS.md. They must be clearly identified as
+modified and must not claim to be an official build.
+Third-party components and voice assets included in the WeChat Mini Program
+are not relicensed under GPL-3.0-only. They remain subject to their respective
+licenses and attribution requirements. See wechat-miniprogram/NOTICE for
+complete attribution and license information.
+Android third-party component:
+
+Xiaomi Wearable SDK 1.4
+File: Android/app/libs/xms-wearable-lib_1.4_release.aar
+Source: Xiaomi Vela official Interconnect Development and Testing Demo.
+
+This component is provided by Xiaomi and is not relicensed under
+GPL-3.0-only by this project. Copyright and licensing terms for this
+component remain with Xiaomi and/or its respective licensors.

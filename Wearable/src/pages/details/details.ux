@@ -1,0 +1,63 @@
+<template>
+  <div class="page">
+    <div class="header"><input class="back" type="button" value="‹ 返回" onclick="back"/><text class="title">项目详情</text></div>
+    <text class="project">{{project}}</text>
+    <list class="list">
+      <list-item type="progress"><div class="progress-card"><text class="progress-number">{{progressText}}</text><text class="progress-sub">第 {{index}} / {{total}} 步</text></div></list-item>
+      <list-item type="row"><div class="row"><text class="label">当前钉号</text><text class="value accent">{{current}}</text></div></list-item>
+      <list-item type="row"><div class="row"><text class="label">钉子数</text><text class="value">{{nailsText}}</text></div></list-item>
+      <list-item type="row"><div class="row"><text class="label">钉位圆直径</text><text class="value">{{circleText}}</text></div></list-item>
+      <list-item type="row"><div class="row"><text class="label">线径</text><text class="value">{{lineText}}</text></div></list-item>
+      <list-item type="row"><div class="row"><text class="label">预计用线</text><text class="value">{{lengthText}}</text></div></list-item>
+      <list-item type="row"><div class="row"><text class="label">状态来源</text><text class="value">{{sourceText}}</text></div></list-item>
+      <list-item type="note"><text class="note">详情优先读取手环离线存档；没有同步存档时读取手机最近一次实时状态</text></list-item>
+    </list>
+  </div>
+</template>
+
+<script>
+import storage from '@system.storage'
+import router from '@system.router'
+
+export default {
+  private: {
+    project: '当前项目', index: 0, total: 0, current: '—', progressText: '0%',
+    nailsText: '—', circleText: '—', lineText: '—', lengthText: '—', sourceText: '无状态'
+  },
+  onInit() { this.load() }, onShow() { this.load() },
+  load() {
+    storage.get({ key: 'active_archive_id', default: '', success: id => {
+      if (id) {
+        storage.get({ key: 'archive_list', default: '[]', success: value => {
+          let list = []; try { list = JSON.parse(value) || [] } catch (e) {}
+          for (let i = 0; i < list.length; i++) if (list[i].archiveId === id) { this.apply(list[i], true); return }
+          this.loadPhoneState()
+        }})
+      } else this.loadPhoneState()
+    }})
+  },
+  loadPhoneState() { storage.get({ key: 'last_phone_state', default: '', success: value => {
+    try { this.apply(JSON.parse(value || '{}'), false) } catch (e) {}
+  }}) },
+  apply(data, archive) {
+    this.project = data.name || data.project || data.source || '当前项目'
+    this.index = archive ? (Number(data.index) || 0) + 1 : Number(data.index) || 0
+    this.total = Number(data.total) || 0
+    this.current = data.current === null || data.current === undefined ? '—' : String(data.current)
+    this.progressText = this.total > 0 ? (Math.round(this.index * 1000 / this.total) / 10) + '%' : '0%'
+    const nails = Number(data.nails) || 0; const circle = Number(data.circleMm) || 0
+    const line = Number(data.lineMm) || 0; const length = Number(data.estimatedMeters) || 0
+    this.nailsText = nails > 0 ? nails + ' 钉' : '—'
+    this.circleText = circle > 0 ? circle + ' mm' : '—'
+    this.lineText = line > 0 ? (Math.round(line * 100) / 100) + ' mm' : '—'
+    this.lengthText = length > 0 ? (Math.round(length * 10) / 10) + ' m' : '—'
+    this.sourceText = archive ? '手环离线存档' : (data.loaded ? '手机最近状态' : '无可用状态')
+  },
+  back() { router.back() }
+}
+</script>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #101016; flex-direction: column; padding: 12px 14px 8px 14px; }.header { width: 308px; height: 48px; flex-direction: row; align-items: center; }.back { width: 86px; height: 40px; border-radius: 14px; color: #ffffff; font-size: 15px; background-color: #262632; }.title { width: 210px; color: #f5f5fa; font-size: 21px; font-weight: bold; text-align: center; }
+.project { width: 308px; height: 28px; color: #9d9dae; font-size: 13px; text-align: center; lines: 1; text-overflow: ellipsis; }.list { width: 308px; height: 392px; }.progress-card { width: 300px; height: 90px; margin-bottom: 8px; border-radius: 20px; background-color: #272135; flex-direction: column; justify-content: center; align-items: center; }.progress-number { height: 50px; color: #ffffff; font-size: 38px; font-weight: bold; }.progress-sub { color: #b9a7e8; font-size: 14px; }.row { width: 300px; height: 52px; margin-bottom: 6px; padding-left: 14px; padding-right: 14px; border-radius: 15px; background-color: #1d1d27; flex-direction: row; justify-content: space-between; align-items: center; }.label { width: 150px; color: #9d9dae; font-size: 15px; }.value { width: 120px; color: #ffffff; font-size: 16px; text-align: right; }.accent { color: #b99cff; font-size: 20px; font-weight: bold; }.note { width: 300px; height: 60px; color: #66667a; font-size: 12px; text-align: center; padding-top: 10px; }
+</style>
