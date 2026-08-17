@@ -17,7 +17,7 @@ Image processing, path generation, previews, voice guidance, and save management
 | Platform | Current version | Purpose | Source and documentation |
 | --- | --- | --- | --- |
 | Android | v26.5.9 (72) | Full generation, preview, guidance, saves, and band management | [Open Android](./Android/README.en.md) |
-| PC | 0.1.0 | Desktop generation, player, and cross-platform saves (drag in images/sequences/saves) | [Open PC](./PC/README.en.md) |
+| PC | v0.1.0 | Desktop generation, player, and cross-platform saves (drag in images/sequences/saves) | [Open PC](./PC/README.en.md) |
 | WeChat Mini Program | v1.2.2 | Generate and build string art inside WeChat | [Open WeChat Mini Program](./wechat-miniprogram/README.en.md) |
 | Xiaomi Smart Band | v26.5.9 (72) | View pins, change steps, jump, preview, and use offline saves | [Open Wearable](./Wearable/README.en.md) |
 

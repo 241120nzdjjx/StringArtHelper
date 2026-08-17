@@ -8,7 +8,7 @@
 
 # StringArtHelper — PC Desktop Version
 
-Current version: **0.1.0**
+Current version: **v0.1.0**
 
 > This directory is the **PC desktop version** (Electron) of the [StringArtHelper](https://github.com/241120nzdjjx/StringArtHelper) project.
 

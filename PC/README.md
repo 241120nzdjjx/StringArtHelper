@@ -8,7 +8,7 @@
 
 # StringArtHelper 桌面版（PC）
 
-当前版本：**0.1.0**
+当前版本：**v0.1.0**
 
 > 本目录是 [StringArtHelper](https://github.com/241120nzdjjx/StringArtHelper) 项目的 **PC 桌面版**（Electron）。
 
