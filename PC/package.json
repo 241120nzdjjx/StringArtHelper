@@ -9,6 +9,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node tests/run-tests.js",
+    "test:java": "node tests/java-compare.js",
     "postinstall": "node node_modules/electron/install.js",
     "dist": "electron-builder --win"
   },

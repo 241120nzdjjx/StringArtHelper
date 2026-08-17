@@ -84,8 +84,9 @@ PC/
 ## Technical Notes
 
 - **Pure-JS core**: everything in `src/core/` is dependency-free CommonJS, runnable in the main process, a worker thread, and Node tests — one implementation for the algorithm and formats.
+- **1:1 algorithm port**: the generator follows Android's `StringArtGenerator.java` line by line, including Java `float` (32-bit) numeric semantics (`Math.fround` + `Float32Array`). `npm run test:java` runs the real Java reference (`tests/java/GenCore.java`, a 1:1 copy of the Android source) on the same inputs — the sequences match **bit-for-bit** on both test cases. See [docs/generator-audit.md](./docs/generator-audit.md).
 - **Worker-thread generation**: generation runs in a `worker_threads` worker; progress and the partial sequence are streamed back for live preview without blocking the UI.
-- **Cross-platform byte compatibility**: SAR and TXT handling are based on the Android implementation and regression-tested byte-for-byte with the fixtures shared by the Mini Program suite.
+- **Cross-platform byte compatibility**: SAR and TXT handling are based on the Android implementation and regression-tested byte-for-byte with the Mini Program suite (`tests/interop.test.js` verifies SAR4/TXT output identical to the Mini Program's original modules).
 - **Security baseline**: `contextIsolation: true`, `nodeIntegration: false`; the renderer only talks to the main process through the minimal preload API; deleting saves uses the OS trash (`shell.trashItem`).
 - **Theme**: the dark theme reuses the Android palette (`#101016` / `#1d1d27`, accent `#9769ff`).
 

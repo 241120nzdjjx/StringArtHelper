@@ -52,3 +52,5 @@ PC/node_modules/
 PC/dist/
 PC/smoke-out/
 PC/*.log
+PC/tests/java/out/
+

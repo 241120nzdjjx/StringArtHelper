@@ -1,3 +1,6 @@
+# CI: Android build & tests, WeChat Mini Program tests, PC desktop core tests,
+# and Xiaomi Smart Band build. PC tests run the core modules (generator, SAR
+# codec, TXT, PDF) plus cross-platform interop checks against the Mini Program.
 name: Build and test
 
 on:

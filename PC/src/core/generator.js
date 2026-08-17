@@ -4,20 +4,27 @@
  *
  * Greedy string-art generator ported 1:1 from the Android app's
  * StringArtGenerator.java (the project's reference implementation).
- * Pure JavaScript, no platform dependencies, so it runs identically in
- * the Electron main process, a worker thread, or a plain Node test.
+ *
+ * NUMERIC FIDELITY: Android computes with Java `float` (32-bit IEEE-754)
+ * everywhere. JavaScript numbers are `double`, so every intermediate value
+ * that Java stores/computes as float is wrapped in Math.fround() here to
+ * reproduce the exact float32 rounding — the residual array is a
+ * Float32Array (matching Java float[]), sampling coordinates, chord scores,
+ * thread-width/opacity and subtract lines all follow float semantics.
+ * Double-only paths (threadMeters, auto-stop coverage, sin()) match Java's
+ * `double` usage there.
  *
  * Working convention (matches Android and the player/template):
  * pin 0 is at the right edge and increasing pin numbers travel clockwise.
  */
 'use strict';
 
+const F = Math.fround;
+
 const WORK_SIZE = 256;
-const TARGET_RADIUS_RATIO = 251 / 255;
-/** Emergency cap only: physical line coverage, not ink coverage. */
-const MAX_AVERAGE_COVERAGE = 2.6;
-const FULL_IMAGE_FIT_MARGIN = 0.98;
-/** Do not immediately revisit a recently used nail. */
+const TARGET_RADIUS_RATIO = F(251 / 255);
+const MAX_AVERAGE_COVERAGE = F(2.6);
+const FULL_IMAGE_FIT_MARGIN = F(0.98);
 const RECENT_PIN_WINDOW = 20;
 const MAX_CROP_ZOOM = 4;
 /** Cap on cached rasterised chords (symmetric pairs share one entry). */
@@ -31,7 +38,9 @@ function minimumCropZoom(width, height) {
   if (!width || !height) return 1;
   const diagonal = Math.hypot(width, height);
   const base = Math.min(width, height);
-  return Math.min(1, (base * TARGET_RADIUS_RATIO * FULL_IMAGE_FIT_MARGIN) / diagonal);
+  // Android: Math.min(1f, base * TARGET_RADIUS_RATIO * FULL_IMAGE_FIT_MARGIN / diagonal)
+  // (int*float → float, float*float → float, then float/double → double, result float)
+  return F(Math.min(1, F(F(base * TARGET_RADIUS_RATIO) * FULL_IMAGE_FIT_MARGIN) / diagonal));
 }
 
 function clampCropZoom(width, height, zoom) {
@@ -43,63 +52,69 @@ function cropSizePx(width, height, zoom) {
 }
 
 /**
- * Build the 256×256 working residual from a source RGBA buffer.
- * `pixels` is a Uint8ClampedArray/Uint8Array with 4 bytes per pixel,
- * `width`/`height` are the source dimensions, and cropX/cropY are the
- * crop centre in relative (0..1) coordinates, cropZoom as in Android.
+ * Build the 256×256 working residual from a source RGBA buffer, matching
+ * Android's makeTarget including float32 semantics and its sample mapping:
+ *   sx = round(x0 + x/(size-1) * (crop-1)), x0 = cropX*w - crop/2
  */
 function buildResidual(pixels, width, height, cropX, cropY, cropZoom) {
   const size = WORK_SIZE;
   const crop = cropSizePx(width, height, cropZoom);
-  const x0 = cropX * width - crop * 0.5;
-  const y0 = cropY * height - crop * 0.5;
+  // float: cropX * width - crop * 0.5f
+  const x0 = F(F(F(cropX) * width) - F(crop * 0.5));
+  const y0 = F(F(F(cropY) * height) - F(crop * 0.5));
   const residual = new Float32Array(size * size);
-  const center = (size - 1) * 0.5;
-  const radius = center - 2;
+  const center = F((size - 1) * 0.5);
+  const radius = F(center - 2);
   const radiusSquared = radius * radius;
+  const denom = F(size - 1);
+  const cropMinus1 = F(crop - 1);
   for (let y = 0; y < size; y++) {
-    const sy = Math.round(y0 + (y / (size - 1)) * (crop - 1));
+    // float: round(y0 + y/(size-1) * (crop-1))
+    const sy = Math.round(F(F(y0) + F(F(y / denom) * cropMinus1)));
     if (sy < 0 || sy >= height) continue;
     const sourceRow = sy * width * 4;
     for (let x = 0; x < size; x++) {
       const dx = x - center;
       const dy = y - center;
       if (dx * dx + dy * dy > radiusSquared) continue;
-      const sx = Math.round(x0 + (x / (size - 1)) * (crop - 1));
-      // Samples outside the photo are the physical white board. Do not
-      // stretch the nearest edge pixel into this otherwise empty area.
+      // float: round(x0 + x/(size-1) * (crop-1))
+      const sx = Math.round(F(F(x0) + F(F(x / denom) * cropMinus1)));
       if (sx < 0 || sx >= width) continue;
       const offset = sourceRow + sx * 4;
-      const alpha = (pixels[offset + 3] == null ? 255 : pixels[offset + 3]) / 255;
-      const luminance = (
-        (pixels[offset] || 0) * 0.2126 +
-        (pixels[offset + 1] || 0) * 0.7152 +
-        (pixels[offset + 2] || 0) * 0.0722
-      ) / 255;
-      // The physical board is white; transparent pixels arrive as RGB(0,0,0),
-      // so composite the alpha over white before computing darkness.
-      residual[y * size + x] = 1 - (luminance * alpha + (1 - alpha));
+      // float: alpha = ((color >>> 24) & 255) / 255f
+      const alpha = F((pixels[offset + 3] == null ? 255 : pixels[offset + 3]) / 255);
+      // float luminance (0.2126f / 0.7152f / 0.0722f are float32 constants):
+      const luminance = F(
+        F(F(F(pixels[offset] * F(0.2126)) + F(pixels[offset + 1] * F(0.7152))) +
+          F(pixels[offset + 2] * F(0.0722))) / 255
+      );
+      // float: luminance = luminance * alpha + (1f - alpha); target = 1f - luminance
+      residual[y * size + x] = F(1 - F(F(F(luminance * alpha) + F(1 - alpha))));
     }
   }
   return residual;
 }
 
-/** Android makePath: uniform t-interpolation with rounding (not Bresenham). */
+/** Android makePath with float semantics: t = i/(float)(count-1). */
 function makePath(size, x0, y0, x1, y1) {
   const dx = x1 - x0;
   const dy = y1 - y0;
   const count = Math.max(Math.abs(dx), Math.abs(dy)) + 1;
   const path = new Int32Array(count);
+  const denom = F(count - 1);
   for (let i = 0; i < count; i++) {
-    const t = count === 1 ? 0 : i / (count - 1);
-    const x = Math.round(x0 + dx * t);
-    const y = Math.round(y0 + dy * t);
+    // float t = count == 1 ? 0f : i / (float)(count - 1);
+    const t = count === 1 ? 0 : F(i / denom);
+    // int x = Math.round(x0 + dx * t);
+    const x = Math.round(F(x0 + F(dx * t)));
+    const y = Math.round(F(y0 + F(dy * t)));
     path[i] = y * size + x;
   }
   return path;
 }
 
-/** Simple LRU path cache; symmetric pairs share one rasterisation. */
+/** Simple LRU path cache; symmetric pairs share one rasterisation.
+ *  makePath is deterministic, so eviction never changes the result. */
 function createPathCache(limit) {
   const cache = new Map();
   const capacity = Math.max(1, limit || PATH_CACHE_LIMIT);
@@ -125,25 +140,30 @@ function createPathCache(limit) {
   };
 }
 
+/** Android: 2f * amount * residual - amount * amount (all float). */
 function squaredErrorGain(residual, amount) {
-  return 2 * amount * residual - amount * amount;
+  const term1 = F(F(F(2 * amount) * residual));
+  const term2 = F(amount * amount);
+  return F(term1 - term2);
 }
 
+/** Android: float score accumulated per sampled pixel. */
 function scoreLine(residual, path, amount) {
   let score = 0;
-  for (let i = 0; i < path.length; i++) score += squaredErrorGain(residual[path[i]], amount);
+  for (let i = 0; i < path.length; i++) {
+    score = F(score + squaredErrorGain(residual[path[i]], amount));
+  }
   return score;
 }
 
 function subtractResidual(residual, size, x, y, amount) {
   if (x < 0 || y < 0 || x >= size || y >= size) return;
-  residual[y * size + x] -= amount;
+  residual[y * size + x] = F(residual[y * size + x] - amount);
 }
 
 /**
- * A real thread has width: softly clear adjacent samples so the greedy
- * picker does not stack almost identical chords into dark edge bars.
- * Ported exactly from Android's subtractLine.
+ * Android subtractLine: a real thread has width; softly clear adjacent
+ * samples so the greedy picker does not stack almost identical chords.
  */
 function subtractLine(residual, size, path, widthPx, opacity, subPixelAmount) {
   for (let i = 0; i < path.length; i++) {
@@ -151,8 +171,8 @@ function subtractLine(residual, size, path, widthPx, opacity, subPixelAmount) {
     const x = p % size;
     const y = (p / size) | 0;
     if (widthPx < 1) {
-      residual[p] -= subPixelAmount;
-      const fringe = subPixelAmount * 0.06;
+      residual[p] = F(residual[p] - subPixelAmount);
+      const fringe = F(subPixelAmount * 0.06);
       subtractResidual(residual, size, x - 1, y, fringe);
       subtractResidual(residual, size, x + 1, y, fringe);
       subtractResidual(residual, size, x, y - 1, fringe);
@@ -163,19 +183,22 @@ function subtractLine(residual, size, path, widthPx, opacity, subPixelAmount) {
     const after = path[Math.min(path.length - 1, i + 1)];
     const tangentX = after % size - before % size;
     const tangentY = ((after / size) | 0) - ((before / size) | 0);
-    const length = Math.hypot(tangentX, tangentY);
-    const normalX = length > 0 ? -tangentY / length : 0;
-    const normalY = length > 0 ? tangentX / length : 1;
-    const radius = Math.ceil(widthPx * 0.5 + 0.5);
+    const length = F(Math.hypot(tangentX, tangentY));
+    // float: -tangentY / length  (int / float → float)
+    const normalX = length > 0 ? F(-tangentY / length) : 0;
+    const normalY = length > 0 ? F(tangentX / length) : 1;
+    // int radius = (int) Math.ceil(widthPx * .5f + .5f);
+    const radius = Math.ceil(F(F(widthPx * 0.5) + 0.5));
     for (let offset = -radius; offset <= radius; offset++) {
-      const coverage = clamp(widthPx * 0.5 + 0.5 - Math.abs(offset), 0, 1);
+      // float: widthPx * .5f + .5f - Math.abs(offset)
+      const coverage = clamp(F(F(F(widthPx * 0.5) + 0.5) - Math.abs(offset)), 0, 1);
       if (coverage <= 0) continue;
       subtractResidual(
         residual,
         size,
-        Math.round(x + normalX * offset),
-        Math.round(y + normalY * offset),
-        opacity * coverage
+        Math.round(F(x + F(normalX * offset))),
+        Math.round(F(y + F(normalY * offset))),
+        F(opacity * coverage)
       );
     }
   }
@@ -187,23 +210,10 @@ function circularGap(from, to, count) {
 }
 
 /**
- * Generate a greedy string-art sequence.
- *
- * options:
- *   pixels        Uint8ClampedArray RGBA source (any size; cropped internally)
- *   width,height  source dimensions
- *   cropX,cropY   crop centre in 0..1 (default 0.5)
- *   cropZoom      crop zoom (clamped to [minimumCropZoom, 4])
- *   pinCount      nails on the ring (20..10000, UI range 100..500)
- *   requestedLines max chords to generate (10..100000)
- *   circleMm      physical nail-circle diameter in mm (default 260)
- *   lineMm        physical thread diameter in mm, 0.01..1 (default 0.2)
- *   autoStop      stop when the residual is exhausted (default true)
- *   cancelled     optional () => boolean
- *   onProgress    optional (complete, total) => void
- *
- * Returns { sequence, threadMeters, lines, lineDarkness, pathCacheSize }
- * or null when cancelled.
+ * Generate a greedy string-art sequence. Options match the Android call:
+ *   pixels(RGBA), width, height, cropX, cropY, cropZoom,
+ *   pinCount, requestedLines, circleMm, lineMm, autoStop,
+ *   cancelled, onProgress.
  */
 function generate(options) {
   const size = WORK_SIZE;
@@ -219,28 +229,35 @@ function generate(options) {
   const pinCount = clamp(Math.round(options.pinCount || 220), 2, 10000);
   const requestedLines = clamp(Math.round(options.requestedLines || 4000), 10, 20000);
   const circleMm = Math.max(1, Number(options.circleMm) || 260);
-  const safeLineMm = clamp(Number(options.lineMm) || 0.2, 0.01, 1);
+  // float safeLineMm = max(.01f, min(1f, lineMm))
+  const safeLineMm = F(clamp(Number(options.lineMm) || 0.2, 0.01, 1));
   const autoStop = options.autoStop !== false;
   const cancelled = options.cancelled || (() => false);
   const onProgress = options.onProgress || (() => {});
 
   const residual = buildResidual(pixels, width, height, cropX, cropY, cropZoom);
-  const threadWidthPx = Math.max(
+  // float: max(.12f, TARGET_RADIUS_RATIO * (size-1f) * safeLineMm / max(80f, circleMm))
+  const threadWidthPx = F(Math.max(
     0.12,
-    (TARGET_RADIUS_RATIO * (size - 1) * safeLineMm) / Math.max(80, circleMm)
-  );
-  const threadOpacity = Math.max(26, Math.min(82, 26 + threadWidthPx * 90)) / 255;
-  const lineDarkness = threadOpacity * Math.min(1, threadWidthPx);
+    F(F(TARGET_RADIUS_RATIO * F(size - 1)) * safeLineMm) / Math.max(80, circleMm)
+  ));
+  // float: max(26f, min(82f, 26f + threadWidthPx * 90f)) / 255f
+  const threadOpacity = F(Math.max(26, Math.min(82, F(26 + F(threadWidthPx * 90)))) / 255);
+  // float: threadOpacity * min(1f, threadWidthPx)
+  const lineDarkness = F(threadOpacity * Math.min(1, threadWidthPx));
+  // int: max(8, pinCount / 28)
   const minPinGap = Math.max(8, Math.floor(pinCount / 28));
 
   const pinX = new Int32Array(pinCount);
   const pinY = new Int32Array(pinCount);
-  const center = (size - 1) * 0.5;
-  const radius = center - 3;
+  // float center = (size - 1) * 0.5f; float radius = center - 3f;
+  const center = F((size - 1) * 0.5);
+  const radius = F(center - 3);
   for (let i = 0; i < pinCount; i++) {
+    // double angle; Math.round(center + (float) Math.cos(angle) * radius)
     const angle = (Math.PI * 2 * i) / pinCount;
-    pinX[i] = Math.round(center + Math.cos(angle) * radius);
-    pinY[i] = Math.round(center + Math.sin(angle) * radius);
+    pinX[i] = Math.round(F(center + F(F(Math.cos(angle)) * radius)));
+    pinY[i] = Math.round(F(center + F(F(Math.sin(angle)) * radius)));
   }
 
   const pathCache = createPathCache(PATH_CACHE_LIMIT);
@@ -250,6 +267,7 @@ function generate(options) {
   let recentCursor = 1 % recentPins.length;
   recentPins[0] = 0;
   let current = 0;
+  // double threadMm / areaMm2 (Android uses double here)
   let threadMm = 0;
   const areaMm2 = Math.PI * circleMm * circleMm * 0.25;
   sequence[0] = 0;
@@ -278,6 +296,7 @@ function generate(options) {
 
     subtractLine(residual, size, selected, threadWidthPx, threadOpacity, lineDarkness);
     const gap = circularGap(current, best, pinCount);
+    // double: threadMm += circleMm * Math.sin(Math.PI * gap / pinCount)
     threadMm += circleMm * Math.sin((Math.PI * gap) / pinCount);
     current = best;
     sequence[length++] = current;
@@ -290,13 +309,15 @@ function generate(options) {
     }
     if ((step & 15) === 0 || step + 1 === requestedLines) {
       // Pass a snapshot of the sequence built so far so callers can reveal
-      // chords live while generation is still running.
+      // chords live while generation is still running. (Android calls the
+      // listener every step; here progress is throttled to 16-step batches
+      // purely to bound IPC traffic — it never affects the algorithm.)
       onProgress(step + 1, requestedLines, sequence.subarray(0, length));
     }
     if (
       autoStop &&
       (threadMm * safeLineMm) / areaMm2 >= MAX_AVERAGE_COVERAGE &&
-      bestScore / selected.length < lineDarkness * lineDarkness * 0.15
+      F(bestScore / selected.length) < F(F(lineDarkness * lineDarkness) * 0.15)
     ) {
       break;
     }

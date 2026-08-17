@@ -41,7 +41,7 @@ Every platform README contains relative links to Project Home, Android, PC, WeCh
 
 ## Downloads
 
-Download official packages and matching source archives from [GitHub Releases](https://github.com/241120nzdjjx/StringArtHelper/releases). Verify them with `StringArtHelper-v0.1.0-SHA256.txt` from the same release.
+Download official packages and matching source archives from [GitHub Releases](https://github.com/241120nzdjjx/StringArtHelper/releases). Verify them with `StringArtHelper-v26.5.9-SHA256.txt` from the same release.
 
 Release files:
 

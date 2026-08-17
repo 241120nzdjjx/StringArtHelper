@@ -84,8 +84,9 @@ PC/
 ## 技术要点
 
 - **纯 JS 核心**：`src/core/` 全部为无依赖的 CommonJS 模块，可在主进程、worker 线程与 Node 测试中直接运行，保证算法与格式单一实现。
+- **1:1 算法移植**：生成算法按 Android `StringArtGenerator.java` 逐行移植，并全程模拟 Java `float`（32 位）数值语义（`Math.fround` + `Float32Array`）；`npm run test:java` 用真实 Java 参考实现（`tests/java/GenCore.java`，Android 源码的 1:1 复制）做同输入对照，两组用例**序列逐位一致**。详见 [docs/generator-audit.md](./docs/generator-audit.md)。
 - **Worker 线程生成**：生成过程通过 `worker_threads` 运行，进度与已生成序列分段回传渲染进程，实现实时预览且界面零卡顿。
-- **跨端字节兼容**：SAR 编解码、TXT 解析均以 Android 版为基准，并由与微信小程序版共享的测试夹具做字节级回归。
+- **跨端字节兼容**：SAR 编解码、TXT 解析均以 Android 版为基准，并由与微信小程序版共享的测试夹具做字节级回归（`tests/interop.test.js` 验证 SAR4/TXT 与小程序原版模块逐字节一致）。
 - **安全基线**：`contextIsolation: true`、`nodeIntegration: false`，渲染进程仅通过 preload 暴露的最小 API 与主进程通信；删除存档走系统回收站（`shell.trashItem`）。
 - **主题**：深色主题取色与 Android 版一致（`#101016` / `#1d1d27` / 强调色 `#9769ff`）。
 

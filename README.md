@@ -41,7 +41,7 @@ StringArtHelper/
 
 ## 下载
 
-正式安装包与对应源码压缩包请从 [GitHub Releases](https://github.com/241120nzdjjx/StringArtHelper/releases) 下载，并使用同一 Release 中的 `StringArtHelper-v0.1.0-SHA256.txt` 核对文件完整性。
+正式安装包与对应源码压缩包请从 [GitHub Releases](https://github.com/241120nzdjjx/StringArtHelper/releases) 下载，并使用同一 Release 中的 `StringArtHelper-v26.5.9-SHA256.txt` 核对文件完整性。
 
 本次发布文件：
 
