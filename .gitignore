@@ -54,3 +54,5 @@ PC/smoke-out/
 PC/*.log
 PC/tests/java/out/
 
+release/
+
