@@ -3,20 +3,21 @@
 </p>
 
 <p align="center">
-  <strong>Project Home</strong> · <a href="./Android/README.en.md">Android</a> · <a href="./wechat-miniprogram/README.en.md">wechat mini Program</a> · <a href="./Wearable/README.en.md">Xiaomi Smart Band</a>
+  <strong>Project Home</strong> · <a href="./Android/README.en.md">Android</a> · <a href="./PC/README.en.md">PC</a> · <a href="./wechat-miniprogram/README.en.md">wechat mini Program</a> · <a href="./Wearable/README.en.md">Xiaomi Smart Band</a>
 </p>
 
 # StringArtHelper
 
-StringArtHelper is a free, open-source, ad-free toolkit for generating and building string art. The project includes an Android app, a WeChat Mini Program, and a companion app for Xiaomi Smart Band 9 Pro.
+StringArtHelper is a free, open-source, ad-free toolkit for generating and building string art. The project includes an Android app, a PC desktop app, a WeChat Mini Program, and a companion app for Xiaomi Smart Band 9 Pro.
 
-Image processing, path generation, previews, voice guidance, and save management are designed to run locally. Android and the WeChat Mini Program exchange TXT, `.bin`, and `.sar` files. Android saves can also be synchronized to the band for continued use without the phone.
+Image processing, path generation, previews, voice guidance, and save management are designed to run locally. Android, the PC desktop app, and the WeChat Mini Program exchange TXT, `.bin`, and `.sar` files. Android saves can also be synchronized to the band for continued use without the phone.
 
 ## Choose a Platform
 
 | Platform | Current version | Purpose | Source and documentation |
 | --- | --- | --- | --- |
 | Android | v26.5.9 (72) | Full generation, preview, guidance, saves, and band management | [Open Android](./Android/README.en.md) |
+| PC | 0.1.0 | Desktop generation, player, and cross-platform saves (drag in images/sequences/saves) | [Open PC](./PC/README.en.md) |
 | WeChat Mini Program | v1.2.2 | Generate and build string art inside WeChat | [Open WeChat Mini Program](./wechat-miniprogram/README.en.md) |
 | Xiaomi Smart Band | v26.5.9 (72) | View pins, change steps, jump, preview, and use offline saves | [Open Wearable](./Wearable/README.en.md) |
 
@@ -25,6 +26,7 @@ Image processing, path generation, previews, voice guidance, and save management
 ```text
 StringArtHelper/
 ├── Android/                Android source and bilingual documentation
+├── PC/                     PC desktop app (Electron) source and documentation
 ├── wechat-miniprogram/     WeChat Mini Program source and documentation
 ├── Wearable/               Xiaomi Smart Band 9 Pro source and documentation
 ├── .github/workflows/      Android and wearable builds, plus Mini Program tests
@@ -35,7 +37,7 @@ StringArtHelper/
 └── LICENSE                 Open-source license
 ```
 
-Every platform README contains relative links to Project Home, Android, WeChat Mini Program, and Xiaomi Smart Band. Each link stays in the currently selected language and also works in a downloaded copy of the repository.
+Every platform README contains relative links to Project Home, Android, PC, WeChat Mini Program, and Xiaomi Smart Band. Each link stays in the currently selected language and also works in a downloaded copy of the repository.
 
 ## Downloads
 
@@ -48,12 +50,17 @@ Release files:
 - `StringArtHelper-Wearable-v26.5.9-MiBand9Pro.rpk`
 - `StringArtHelper-Wearable-v26.5.9-source.zip`
 - `StringArtHelper-WeChat-MiniProgram-v1.2.2-source.zip`
+- `StringArtHelper-PC-0.1.0-x64.exe` (Windows portable, no install required)
+- `StringArtHelper-PC-0.1.0-source.zip`
+- `StringArtHelper-v26.5.9-SHA256.txt` (hashes for all files)
+
+> Note: the Release page also auto-attaches the two GitHub-generated `Source code` archives.
 
 ## Compatibility
 
 - The Android APK and wearable RPK both use package name `com.niuza.stringartreader2`.
 - Android and wearable versions should match; this release uses v26.5.9 (versionCode 72) on both platforms.
-- Android and the WeChat Mini Program can exchange TXT, `.bin`, and `.sar` saves.
+- Android, the PC app, and the WeChat Mini Program can exchange TXT, `.bin`, and `.sar` saves.
 - Wearable saves are synchronized by Android. Once synchronized, the band can change steps and preserve progress offline.
 
 ## Privacy and Security

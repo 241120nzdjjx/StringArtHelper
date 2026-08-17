@@ -1,0 +1,38 @@
+{
+  "name": "string-art-helper-pc",
+  "productName": "StringArtHelper",
+  "version": "0.1.0",
+  "description": "PC desktop companion for String Art Helper: image-to-sequence generation, sequence player and cross-platform (.sar/.bin/.txt) save management.",
+  "main": "src/main/main.js",
+  "author": "241120nzdjjx",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/run-tests.js",
+    "postinstall": "node node_modules/electron/install.js",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.niuza.stringarthelper.pc",
+    "productName": "StringArtHelper",
+    "artifactName": "StringArtHelper-PC-${version}-${arch}.${ext}",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "src/renderer/assets"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "icon.ico"
+    }
+  }
+}

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: file:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'" />
+  <title>绕线助手 · String Art Helper (PC)</title>
+  <link rel="icon" href="assets/icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 顶栏 -->
+    <header id="toolbar">
+      <div class="brand" title="String Art Helper">
+        <img class="brand-mark" src="assets/icon.png" alt="" />
+        <span class="brand-text" data-i18n="appName">绕线助手</span>
+      </div>
+      <div class="toolbar-group">
+        <button id="btn-open-image" class="btn" data-i18n="openImage" title="Ctrl+O">打开图片</button>
+        <button id="btn-open-file" class="btn" data-i18n="openSequence" title="Ctrl+Shift+O">打开序列/存档</button>
+        <span class="divider"></span>
+        <button id="btn-save-project" class="btn" data-i18n="saveProject" title="Ctrl+S">保存项目</button>
+        <button id="btn-export-txt" class="btn" data-i18n="exportTxt" title="Ctrl+E">导出序列</button>
+        <button id="btn-export-pdf" class="btn" data-i18n="exportPdf" title="Ctrl+P">导出模板</button>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <div class="toolbar-group">
+        <button id="btn-language" class="btn btn-ghost" title="Language">EN / 中</button>
+      </div>
+    </header>
+
+    <!-- 主区域 -->
+    <main id="main">
+      <!-- 左栏：项目与最近文件 -->
+      <aside id="sidebar">
+        <div class="side-section">
+          <div class="side-title">
+            <span data-i18n="projects">项目</span>
+            <button id="btn-open-projects-folder" class="link" data-i18n="openFolder">打开目录</button>
+          </div>
+          <div id="project-list" class="side-list"></div>
+        </div>
+        <div class="side-section">
+          <div class="side-title" data-i18n="recent">最近文件</div>
+          <div id="recent-list" class="side-list"></div>
+        </div>
+      </aside>
+
+      <!-- 中央画布区 -->
+      <section id="canvas-pane">
+        <!-- 空状态 -->
+        <div id="empty-state">
+          <div class="empty-icon">🧶</div>
+          <div class="empty-title" data-i18n="emptyTitle">把图片、序列或存档拖到这里</div>
+          <div class="empty-sub" data-i18n="emptySub">支持 图片 / .txt 序列 / .sar · .bin 存档，与 Android、微信小程序版互通</div>
+          <div class="empty-actions">
+            <button id="btn-empty-open-image" class="btn btn-primary" data-i18n="chooseImage">选择图片生成</button>
+            <button id="btn-empty-open-file" class="btn" data-i18n="chooseSequence">打开序列 / 存档</button>
+          </div>
+        </div>
+
+        <!-- 裁剪视图 -->
+        <div id="crop-view" class="hidden">
+          <canvas id="crop-canvas"></canvas>
+          <div id="crop-hint" class="canvas-hint" data-i18n="cropHint">拖动调整裁剪框 · 滚轮缩放 · 双击复位</div>
+        </div>
+
+        <!-- 播放器 / 生成预览视图 -->
+        <div id="player-view" class="hidden">
+          <canvas id="player-canvas"></canvas>
+          <div id="player-hint" class="canvas-hint" data-i18n="playerHint">滚轮缩放 · 拖动平移 · 空格播放/暂停</div>
+        </div>
+
+        <!-- 拖放遮罩 -->
+        <div id="drop-overlay" class="hidden">
+          <div class="drop-box">
+            <div class="empty-icon">📥</div>
+            <div class="empty-title" data-i18n="dropTitle">松开鼠标导入</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右栏：生成参数 / 播放器控制 -->
+      <aside id="inspector">
+        <div id="gen-panel" class="hidden">
+          <div class="side-title" data-i18n="generator">生成参数</div>
+          <div class="field">
+            <label for="inp-nails" data-i18n="nails">钉子数</label>
+            <input id="inp-nails" type="number" min="100" max="500" step="10" value="220" />
+            <span class="field-note">100–500</span>
+          </div>
+          <div class="field">
+            <label for="inp-lines" data-i18n="lines">最大线数</label>
+            <input id="inp-lines" type="number" min="10" max="20000" step="500" value="4000" />
+            <span class="field-note" data-i18n="linesNote">自动停止时实际线数可能更少</span>
+          </div>
+          <div class="field">
+            <label for="inp-circle" data-i18n="circleMm">钉位圆直径 (mm)</label>
+            <input id="inp-circle" type="number" min="80" max="1200" step="10" value="260" />
+            <span class="field-note">80–1200</span>
+          </div>
+          <div class="field">
+            <label for="inp-line" data-i18n="lineMm">线径 (mm)</label>
+            <input id="inp-line" type="number" min="0.01" max="1" step="0.01" value="0.20" />
+            <span class="field-note">0.01–1.00</span>
+          </div>
+          <label class="check">
+            <input id="inp-autostop" type="checkbox" checked />
+            <span data-i18n="autoStop">剩余像素耗尽时自动停止</span>
+          </label>
+          <button id="btn-generate" class="btn btn-primary btn-block" data-i18n="generate">生成序列</button>
+          <button id="btn-cancel-crop" class="btn btn-ghost btn-block" data-i18n="cancel">取消</button>
+        </div>
+
+        <div id="gen-progress-panel" class="hidden">
+          <div class="side-title" data-i18n="generating">正在生成…</div>
+          <div class="progress-track"><div id="gen-progress-bar" class="progress-fill"></div></div>
+          <div id="gen-progress-text" class="muted small">0 / 0</div>
+          <button id="btn-cancel-generate" class="btn btn-block" data-i18n="cancel">取消</button>
+        </div>
+
+        <div id="import-panel" class="hidden">
+          <div class="side-title" data-i18n="txtImportTitle">TXT 导入预览</div>
+          <div id="import-info" class="muted small"></div>
+          <div class="modal-note" style="margin-top:4px" data-i18n="importHint">
+            若序列文件未附带物理参数，请按实际绕线的圆径和线径调整。
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="import-line-range" data-i18n="importLine">线径（预览显示）</label>
+            <div class="range-with-input">
+              <input id="import-line-range" type="range" min="1" max="100" value="20" />
+              <span id="import-line-value" class="muted small">0.20 mm</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="import-circle-range" data-i18n="importCircle">钉位圆直径</label>
+            <div class="range-with-input">
+              <input id="import-circle-range" type="range" min="80" max="1200" step="5" value="260" />
+              <span id="import-circle-value" class="muted small">260 mm</span>
+            </div>
+          </div>
+          <button id="btn-import-open" class="btn btn-primary btn-block" data-i18n="importAndOpen">导入并打开</button>
+          <button id="btn-import-cancel" class="btn btn-ghost btn-block" data-i18n="cancel">取消</button>
+        </div>
+
+        <div id="player-panel" class="hidden">
+          <div class="side-title" data-i18n="player">播放器</div>
+          <div class="player-trio">
+            <div class="player-side">
+              <div class="player-trio-label" data-i18n="prevPin">前</div>
+              <div id="player-prev" class="player-side-num">–</div>
+            </div>
+            <div id="player-number" class="player-number">–</div>
+            <div class="player-side">
+              <div class="player-trio-label" data-i18n="nextPin">后</div>
+              <div id="player-next" class="player-side-num">–</div>
+            </div>
+          </div>
+          <div id="player-progress" class="muted small">–</div>
+          <div class="btn-row">
+            <button id="btn-prev" class="btn" title="←" data-i18n="prev">上一步</button>
+            <button id="btn-play" class="btn btn-primary" data-i18n="play">播放</button>
+            <button id="btn-next" class="btn" title="→" data-i18n="next">下一步</button>
+          </div>
+          <div class="btn-row">
+            <button id="btn-jump" class="btn" data-i18n="jump">跳转…</button>
+            <button id="btn-replay" class="btn" data-i18n="replay">重播当前</button>
+          </div>
+          <div class="btn-row">
+            <button id="btn-animate" class="btn btn-primary" data-i18n="previewAnimation">预览动画</button>
+          </div>
+          <div class="field">
+            <label for="inp-anim-speed" data-i18n="animSpeed">动画速度</label>
+            <input id="inp-anim-speed" type="range" min="1" max="20" value="6" />
+          </div>
+          <div class="field">
+            <label for="inp-delay" data-i18n="stepDelay">步进间隔 (秒)</label>
+            <div class="delay-row">
+              <button id="btn-slower" class="btn btn-sm" data-i18n="slower">慢一点</button>
+              <input id="inp-delay" type="number" min="0.5" max="10" step="0.5" value="2.5" />
+              <button id="btn-faster" class="btn btn-sm" data-i18n="faster">快一点</button>
+            </div>
+          </div>
+          <div class="field">
+            <label data-i18n="lineDisplay">线宽显示</label>
+            <div class="btn-row" id="line-mode-row">
+              <button id="btn-line-actual" class="btn btn-toggle" data-i18n="actualRatio">实际比例</button>
+              <button id="btn-line-custom" class="btn btn-toggle" data-i18n="custom">自定义</button>
+            </div>
+            <div id="custom-line-wrap" class="hidden">
+              <div class="range-with-input">
+                <input id="inp-custom-line" type="range" min="1" max="100" value="10" />
+                <input id="inp-custom-line-number" type="number" min="0.01" max="1" step="0.01" value="0.10" />
+                <span class="field-unit">mm</span>
+              </div>
+            </div>
+          </div>
+          <label class="check">
+            <input id="inp-show-indices" type="checkbox" checked />
+            <span data-i18n="showIndices">显示钉号</span>
+          </label>
+          <label class="check">
+            <input id="inp-show-all" type="checkbox" />
+            <span data-i18n="showAll">显示完整效果</span>
+          </label>
+          <label class="check">
+            <input id="inp-speak" type="checkbox" />
+            <span data-i18n="speak">朗读钉号（系统语音）</span>
+          </label>
+          <label class="check">
+            <input id="inp-repeat" type="checkbox" />
+            <span data-i18n="repeatTwice">每个钉号重复播报两次</span>
+          </label>
+          <div class="field">
+            <label for="inp-rate" data-i18n="speechRate">播报语速</label>
+            <input id="inp-rate" type="range" min="50" max="160" value="90" />
+            <span id="rate-value" class="muted small">0.9×</span>
+          </div>
+          <div class="btn-row">
+            <button id="btn-save-here" class="btn" data-i18n="saveToProjects">存入项目列表</button>
+            <button id="btn-save-as" class="btn" data-i18n="saveAs">另存为…</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- 状态栏 -->
+    <footer id="statusbar">
+      <span id="status-project" data-i18n="noProject">未打开项目</span>
+      <span class="status-spacer"></span>
+      <span id="status-hint"></span>
+    </footer>
+  </div>
+
+  <div id="modal-overlay" class="hidden">
+    <div id="modal-box"></div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>

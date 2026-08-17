@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">项目主页</a> · <strong>Android</strong> · <a href="../wechat-miniprogram/README.md">微信小程序</a> · <a href="../Wearable/README.md">小米手环</a>
+  <a href="../README.md">项目主页</a> · <strong>Android</strong> · <a href="../PC/README.md">PC</a> · <a href="../wechat-miniprogram/README.md">微信小程序</a> · <a href="../Wearable/README.md">小米手环</a>
 </p>
 
 # 绕线助手 Android 版
@@ -27,6 +27,7 @@ Android 版提供从图片生成绕线序列、实时预览、离线语音播报
 
 ## 与其他端互通
 
+- [PC 桌面版](../PC/README.md)可与 Android 互相导入 TXT、`.bin` 和 `.sar` 文件。
 - [微信小程序版](../wechat-miniprogram/README.md)可与 Android 互相导入 TXT、`.bin` 和 `.sar` 文件。
 - [小米手环版](../Wearable/README.md)通过 Android 配套接口读取当前状态和同步存档；同步后可脱离手机继续换步。
 

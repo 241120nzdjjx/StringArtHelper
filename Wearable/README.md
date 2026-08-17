@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">项目主页</a> · <a href="../Android/README.md">Android</a> · <a href="../wechat-miniprogram/README.md">微信小程序</a> · <strong>小米手环</strong>
+  <a href="../README.md">项目主页</a> · <a href="../Android/README.md">Android</a> · <a href="../PC/README.md">PC</a> · <a href="../wechat-miniprogram/README.md">微信小程序</a> · <strong>小米手环</strong>
 </p>
 
 # 绕线助手小米手环版

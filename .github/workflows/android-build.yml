@@ -98,6 +98,28 @@ jobs:
 
       - name: Run WeChat Mini Program tests
         run: npm test
+
+  pc-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    defaults:
+      run:
+        working-directory: PC
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run PC core tests (no Electron binary needed)
+        run: |
+          npm ci --ignore-scripts
+          node tests/run-tests.js
   wearable-build:
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -2,7 +2,7 @@
   <strong>简体中文</strong> | <a href="./README.en.md">English</a>
 </p>
 <p align="center">
-  <a href="../README.md">项目主页</a> · <a href="../Android/README.md">Android</a> · <strong>微信小程序</strong> · <a href="../Wearable/README.md">小米手环</a>
+  <a href="../README.md">项目主页</a> · <a href="../Android/README.md">Android</a> · <a href="../PC/README.md">PC</a> · <strong>微信小程序</strong> · <a href="../Wearable/README.md">小米手环</a>
 </p>
 
 # 绕线画助手｜StringArtHelper 微信小程序版

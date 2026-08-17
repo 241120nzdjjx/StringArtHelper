@@ -2,7 +2,7 @@
   <a href="./README.md">简体中文</a> | <strong>English</strong>
 </p>
 <p align="center">
-  <a href="../README.en.md">Project Home</a> · <a href="../Android/README.en.md">Android</a> · <strong>WeChat Mini Program</strong> · <a href="../Wearable/README.en.md">Xiaomi Smart Band</a>
+  <a href="../README.en.md">Project Home</a> · <a href="../Android/README.en.md">Android</a> · <a href="../PC/README.en.md">PC</a> · <strong>WeChat Mini Program</strong> · <a href="../Wearable/README.en.md">Xiaomi Smart Band</a>
 </p>
 
 # StringArtHelper | WeChat Mini Program

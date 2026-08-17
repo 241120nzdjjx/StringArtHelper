@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.en.md">Project Home</a> · <a href="../Android/README.en.md">Android</a> · <a href="../wechat-miniprogram/README.en.md">wechat mini Program</a> · <strong>Xiaomi Smart Band</strong>
+  <a href="../README.en.md">Project Home</a> · <a href="../Android/README.en.md">Android</a> · <a href="../PC/README.en.md">PC</a> · <a href="../wechat-miniprogram/README.en.md">wechat mini Program</a> · <strong>Xiaomi Smart Band</strong>
 </p>
 
 # StringArtHelper for Xiaomi Smart Band

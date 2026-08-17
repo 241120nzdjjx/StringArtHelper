@@ -46,3 +46,9 @@ Wearable/dist/
 Wearable/sign/
 .temp_Wearable/
 *.rpk
+
+# PC desktop version (Electron)
+PC/node_modules/
+PC/dist/
+PC/smoke-out/
+PC/*.log

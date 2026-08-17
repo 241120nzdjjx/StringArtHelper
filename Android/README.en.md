@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.en.md">Project Home</a> · <strong>Android</strong> · <a href="../wechat-miniprogram/README.en.md">wechat mini Program</a> · <a href="../Wearable/README.en.md">Xiaomi Smart Band</a>
+  <a href="../README.en.md">Project Home</a> · <strong>Android</strong> · <a href="../PC/README.en.md">PC</a> · <a href="../wechat-miniprogram/README.en.md">wechat mini Program</a> · <a href="../Wearable/README.en.md">Xiaomi Smart Band</a>
 </p>
 
 # StringArtHelper for Android
@@ -27,6 +27,7 @@ The Android edition provides the complete image-to-string-art workflow, live pre
 
 ## Cross-platform Use
 
+- The [PC desktop app](../PC/README.en.md) exchanges TXT, `.bin`, and `.sar` files with Android.
 - The [WeChat Mini Program](../wechat-miniprogram/README.en.md) exchanges TXT, `.bin`, and `.sar` files with Android.
 - The [Xiaomi Smart Band app](../Wearable/README.en.md) reads live status and receives saves through Android. Synchronized saves remain usable without the phone.
 

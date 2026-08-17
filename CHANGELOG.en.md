@@ -6,6 +6,16 @@
 
 This file records the major changes in official Android releases. See the Git commit history for the complete development history.
 
+## 0.1.0 (first PC desktop release)
+
+- Added the `PC/` directory: an Electron desktop version that extracts the core capabilities from the Android source instead of rewriting the project.
+- Ported the greedy generator 1:1 from Android's `StringArtGenerator.java` to dependency-free JS (256×256 work area, thread width/opacity model, recent-pin avoidance, auto-stop). Generation runs in a worker thread, keeping the UI responsive with live per-line preview.
+- Redesigned for the desktop: images, `.txt` sequences and `.sar`/`.bin` saves can be dropped straight into the window; the square crop box is draggable, wheel-zoomable and double-click resets it.
+- Sequence player: previous / next / play-pause / jump / replay with adjustable step delay, thread display in actual ratio or a custom diameter, nail-number labels, wheel-zoom and drag-pan, and optional system-voice narration.
+- Saves are byte-compatible with Android and the Mini Program (SAR2/SAR3/SAR4 and `.bin`); projects auto-save with 192×192 monochrome PNG thumbnails; deletion uses the OS trash.
+- Exports Android-style TXT sequences (with the physical-parameter header) and tiled A4 nail-template PDFs (trim lines, alignment marks, 100 mm calibration ruler).
+- Dark theme reuses the Android palette; bilingual UI; `npm test` covers SAR/TXT/generator/PDF including byte-compatibility fixtures shared with the Mini Program suite.
+
 ## 26.5.9 (versionCode 72)
 
 - Restored standard Chinese cardinal-number wording from 0 through 1000; for example, 119 is spoken as “one hundred nineteen” and 171 as “one hundred seventy-one.”
